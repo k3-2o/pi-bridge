@@ -366,6 +366,47 @@ describe("FR-007: calls", () => {
 	});
 });
 
+describe("live ctx.model (FR-012 parity: per-call model resolution)", () => {
+	test("tools see the session model as it changes, not a session_start snapshot", async () => {
+		let current: { input: string[] } | undefined = { input: ["text"] };
+		let seen: unknown;
+		const probe = makeTool("probe", {
+			execute: async (_id, _params, _signal, _onUpdate, ctx) => {
+				seen = (ctx as { model?: unknown }).model;
+				return { content: [{ type: "text", text: "ok" }] };
+			},
+		});
+		const tools = new Map([["probe", probe]]);
+		const socketPath = join(tmp(), `pi-bridge-${process.pid}-model.sock`);
+		const server = new BridgeServer({
+			socketPath,
+			tools: () => tools,
+			ctx: { sessionManager: { getSessionId: () => "t" } },
+			getModel: () => current,
+		});
+		server.start(socketPath);
+		const c = client(socketPath);
+		await c.connected;
+		await handshake(c);
+
+		c.send({ v: 1, op: "call", id: "m1", tool: "probe", params: {} });
+		await c.next();
+		expect(seen).toEqual({ input: ["text"] });
+
+		current = { input: ["text", "image"] }; // model switched mid-session
+		c.send({ v: 1, op: "call", id: "m2", tool: "probe", params: {} });
+		await c.next();
+		expect(seen).toEqual({ input: ["text", "image"] });
+
+		current = undefined; // model unknown: falls back to the snapshot ctx (undefined here)
+		c.send({ v: 1, op: "call", id: "m3", tool: "probe", params: {} });
+		await c.next();
+		expect(seen).toBeUndefined();
+		server.stop();
+		c.destroy();
+	});
+});
+
 describe("lifecycle", () => {
 	test("stop removes the socket file", () => {
 		const { server, socketPath } = startServer(new Map());
