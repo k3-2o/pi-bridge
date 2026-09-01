@@ -1,4 +1,3 @@
-// Wire protocol v1 (FR-005/FR-007): LF-delimited JSONL, ping/pong handshake, versioned replies.
 import type { ErrorKind } from "./errors.ts";
 
 export const PROTOCOL_VERSION = 1;

@@ -1,6 +1,4 @@
-// The repo root IS the extension (pi loads extensions/<dir>/index.ts); companion to
-// pi-repl-py, zero changes to it. Gate: getFlag() is scoped to own flags, so
-// argv/PI_REPL_FORCE is the reliable read (v1 lesson).
+// Repo root IS the extension; companion to pi-repl-py, zero changes. Gate: argv/PI_REPL_FORCE (getFlag() only sees own flags).
 
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

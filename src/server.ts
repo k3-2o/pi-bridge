@@ -168,7 +168,7 @@ export class BridgeServer {
 		this.connections.add(conn);
 		let handshook = false;
 		const splitter = new FrameSplitter();
-		const local = new Set<string>(); // ids in flight on this connection
+		const local = new Set<string>();
 		conn.on("data", (chunk: Buffer) => {
 			for (const line of splitter.feed(chunk.toString("utf8"))) {
 				if (!handshook) {

@@ -74,7 +74,6 @@ const XCHG = [
 ];
 
 async function main(): Promise<void> {
-	// 0. isolated home
 	const e2eHome = mkdtempSync(join(tmpdir(), "pi-bridge-e2e-home-"));
 	const agent = join(e2eHome, ".pi", "agent");
 	const extDir = join(agent, "extensions", "pi-bridge");
@@ -82,7 +81,6 @@ async function main(): Promise<void> {
 	const runDir = join(bridgeDir, "run");
 	const manifest = join(bridgeDir, "tools.yml");
 	try {
-		// 1. install extension
 		mkdirSync(extDir, { recursive: true });
 		spawnSync("cp", ["-R", join(REPO, "index.ts"), join(extDir, "index.ts")]);
 		spawnSync("cp", ["-R", join(REPO, "src"), join(extDir, "src")]);
@@ -91,7 +89,6 @@ async function main(): Promise<void> {
 			existsSync(join(extDir, "index.ts")) && existsSync(join(extDir, "src/server.ts")),
 		);
 
-		// 2. manifest: 7 SDK + 3 user tools (absolute paths; isolated home has none)
 		mkdirSync(bridgeDir, { recursive: true });
 		mkdirSync(runDir, { recursive: true });
 		const userExt = join(process.env.HOME ?? homedir0(), ".pi/agent/extensions");
@@ -109,7 +106,6 @@ async function main(): Promise<void> {
 			);
 		writeFileSync(manifest, `version: 1\ntools:\n${entries.join("\n")}\n`);
 
-		// 4. boot 1 — catalog + real calls
 		const boot1 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		const up = await waitUntil(() => existsSync(boot1.socketPath), 60_000);
 		check("boot: socket in isolated run dir", up, boot1.socketPath);
@@ -198,7 +194,6 @@ async function main(): Promise<void> {
 		kill9(boot1); // SIGKILL: no cleanup chance — sets up the sweep test
 		const log1 = await boot1.stderr();
 
-		// 5. chaos boot — broken entries diagnosed on stderr, survivors via catalog
 		writeFileSync(
 			manifest,
 			`${await Bun.file(manifest).text()}  - from: "./does-not-exist.ts"\n    factory: createGhost\n  - from: "@earendil-works/pi-coding-agent"\n    factory: notExportedAnywhere\n`,
@@ -259,7 +254,6 @@ async function main(): Promise<void> {
 			JSON.stringify(socketsAfter2),
 		);
 
-		// 6. sweep
 		const boot3 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		const swept = await waitUntil(() => {
 			const socks = readdirSync(runDir).filter((f) => f.endsWith(".sock"));
@@ -268,10 +262,9 @@ async function main(): Promise<void> {
 		check("sweep: only the new boot's socket remains", swept, JSON.stringify(readdirSync(runDir)));
 		kill9(boot3);
 	} finally {
-		rmSync(e2eHome, { recursive: true, force: true }); // throwaway home vanishes
+		rmSync(e2eHome, { recursive: true, force: true });
 	}
 
-	// 7. verdict
 	if (failures === 0) {
 		console.log("\nE2E GREEN — all assertions passed in the isolated home");
 		console.log("real ~/.pi untouched: no install, no v1 changes, no sockets");

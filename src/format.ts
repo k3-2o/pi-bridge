@@ -1,7 +1,6 @@
 // Host-side formatting (FR-009): finished text out, hints in details, images stay host-side.
 import type { ContentBlock, ToolExecutionResult } from "./protocol.ts";
 
-// Raw tool output can carry ANSI escapes and stray CRs; none survive this.
 const ANSI_RE = new RegExp(
 	[
 		String.raw`\x1b\[[0-9;?]*[ -/]*[@-~]`, // CSI sequences
