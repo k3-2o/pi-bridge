@@ -315,7 +315,7 @@ export class BridgeServer {
 			}, seconds * 1000);
 		}
 		try {
-			// FR-012 parity: the tool sees the session's CURRENT model per call — pi
+			// Native parity: the tool sees the session's CURRENT model per call — pi
 			// resolves it after session_start, so the captured ctx snapshot goes stale.
 			const live = this.opts.ctx ?? CTX_SHIM;
 			const opts = this.opts;
