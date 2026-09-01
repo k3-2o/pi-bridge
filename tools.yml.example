@@ -3,7 +3,7 @@
 #
 # Grammar for `from`:
 #   bare token      → a package name (import from the SDK or any installed package)
-#   "~/..."         → a file on disk, home-anchored
+#   "~/..."         → a file on disk, home-anchored (incl. npm store copies)
 #   "./..." "../.." → a file relative to this manifest's directory
 #
 # Entry fields:
