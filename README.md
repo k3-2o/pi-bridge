@@ -27,7 +27,8 @@ flowchart LR
 
 - **The manifest is the surface.** `~/.pi/agent/pi-bridge/tools.yml` declares
   every callable tool: an import source (SDK package or `~/`/`./` file) plus an
-  exported factory name. Adding a tool is one YAML line, and nothing else.
+  exported factory name, the same contract pi's SDK tools follow. Adding a tool
+  is one YAML line, and nothing else.
 - **The engine owns everything.** `index.ts` + `src/` load the manifest, mount
   pi's real tool factories, run a JSONL server, validate every call against the
   tool's real schema, execute with pi's real context, and format output
@@ -55,7 +56,7 @@ cp -R . ~/.pi/agent/extensions/pi-bridge    # or: ln -s "$PWD" ~/.pi/agent/exten
 
 # 2. the manifest
 mkdir -p ~/.pi/agent/pi-bridge
-cp tools.yml.example ~/.pi/agent/pi-bridge/tools.yml   # then edit to taste
+cp examples/tools.yml ~/.pi/agent/pi-bridge/tools.yml   # then edit to taste
 ```
 
 Start `pi --repl`. The bridge sets `PI_BRIDGE_SOCK` in the kernel's environment;
@@ -76,6 +77,53 @@ the catalog op lists what the manifest mounted. First boot creates
 Broken entries never take the bridge down: each failure is skipped with a precise
 diagnostic: wrong path, missing export, garbage factory product, duplicate name.
 The catalog only shows what mounted.
+
+### What "exportable" means
+
+`factory` is the name of a function the module named by `from:` must export.
+At mount the bridge imports that module, calls the function once, and checks the
+product's shape: a string `name` and an async `execute` that takes
+`(toolCallId, params, signal, onUpdate, ctx)` and returns content blocks. That
+is the exact contract pi's own SDK tools follow (`createReadTool`, `createBashTool`
+and friends), which is why SDK tools and your own tools mount through the same
+line of YAML and become indistinguishable in the catalog.
+
+`examples/greet-tool.ts` is a complete one:
+
+```ts
+export function createGreetTool() {
+	return {
+		name: "greet",
+		parameters: {
+			type: "object",
+			properties: { name: { type: "string" } },
+			required: ["name"],
+		},
+		async execute(_toolCallId, params) {
+			return { content: [{ type: "text", text: `hello, ${params.name}` }] };
+		},
+	};
+}
+```
+
+Mount it with:
+
+```yaml
+  - from: "~/my-tools/greet.ts"
+    factory: createGreetTool
+```
+
+`parameters` is optional, but supply it and every call is schema-validated for
+free: bad args get pi's verbatim validation message, and the catalog derives a
+readable signature from the schema.
+
+### Examples in this repo
+
+- `examples/tools.yml`: a complete manifest, both `from:` rules shown
+- `examples/greet-tool.ts`: the smallest exportable tool above, ready to mount
+- `examples/skills/bridge-helper/`: a pi skill that writes a project helper for
+  you and tests it against the live socket. Visit all three before writing
+  anything from scratch.
 
 ## Declaring installed packages (npm or git)
 

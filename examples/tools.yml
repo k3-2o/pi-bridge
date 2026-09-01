@@ -45,3 +45,5 @@ tools:
     factory: createClipboardCopyTool
   - from: "~/.pi/agent/extensions/ask-user-question.ts"
     factory: createAskUserQuestionDefinition
+  # - from: "./greet-tool.ts"
+  #   factory: createGreetTool     # a real one ships beside this file in examples/
