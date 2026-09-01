@@ -30,8 +30,7 @@ interface RawEntry {
 	timeout?: unknown;
 }
 
-/** Grammar (FR-001): bare token = package name; leading ~ = home-anchored file;
- * leading / or ./ or ../ = file path, resolved against the manifest's directory. */
+/** Grammar (FR-001): bare token = package; ~ = home; /,./,../ = path from manifest dir. */
 function toSpecifier(
 	from: string,
 	dir: string,
@@ -50,8 +49,7 @@ function entryDiagnostic(source: string, reason: string): string {
 	return new BridgeConfigError(source, reason).message;
 }
 
-/** Parse and validate manifest text. Never throws: every problem becomes a
- * diagnostic; `entries` holds only what fully validated (FR-002 rows 1-4, 8). */
+/** Parse/validate manifest text; never throws, entries hold only what validated (FR-002). */
 export function parseManifest(
 	text: string,
 	opts: { dir: string; home?: string } = { dir: process.cwd() },

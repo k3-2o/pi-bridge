@@ -91,8 +91,7 @@ export function parseRequest(line: string): BridgeRequest | null {
 	return null;
 }
 
-/** One level of array-item expansion: "edits: array" invites a wrong guess at the
- * item shape; "edits: [{ oldText: string, newText: string }]" does not. */
+/** Array params show array-of-item so "edits: [{ oldText, newText }]" is understood. */
 function propertyType(prop: unknown): string {
 	const p = (prop ?? {}) as {
 		type?: string;
@@ -157,8 +156,7 @@ export function encodeFrame(msg: unknown): string {
 	return `${JSON.stringify(msg)}\n`;
 }
 
-/** Incremental JSONL framing: feed chunks, get complete lines. Splits on LF only,
- * tolerates CRLF, skips blank lines — JSON escapes inside strings never split. */
+/** Incremental JSONL framing: feed chunks, get complete LF-delimited lines. */
 export class FrameSplitter {
 	private buffer = "";
 

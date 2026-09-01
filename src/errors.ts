@@ -82,8 +82,7 @@ export class TransportLostError extends Error {
 	}
 }
 
-/** File-level manifest diagnostics (FR-002 rows 1-3): the whole file failed; the
- * bridge boots with an empty surface and this one line explains where and why. */
+/** File-level manifest diagnostics (FR-002 rows 1-3): whole file failed, empty surface. */
 export function manifestFileDiagnostic(path: string, reason: string): string {
 	return `[pi-bridge] manifest ${path}: ${reason}`;
 }
