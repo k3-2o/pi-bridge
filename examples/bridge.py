@@ -13,12 +13,11 @@ one monolithic cell.
 
 # The model contract: pi-repl-py extracts this verbatim as the tool description.
 helper_description = """pi — pi's real tools from the repl, over the pi-bridge bridge:
-pi.tools() — start here: lists every callable tool with signatures.
-pi.read/bash/write/edit/grep/ls/find — pi's native tools with pi's own semantics.
-pi.web_search(query, intent), pi.clipboard_copy(text), pi.AskUserQuestion(...) — extension tools declared in the manifest.
+pi.tools() — start here: lists every loaded tool with signatures.
+pi.<name>(**params) — any tool in ~/.pi/agent/pi-bridge/tools.yml; keyword args only.
 pi.raw(tool, **params) — full reply dict; details carry truncation hints (truncated, nextOffset).
 Treat each pi.* call as a real tool call: args are schema-validated, failures raise PiBridgeError with pi's message.
-The manifest (~/.pi/agent/pi-bridge/tools.yml) defines the surface — anything declared there is callable as pi.<name>()."""
+The manifest (~/.pi/agent/pi-bridge/tools.yml) defines the surface — nothing is hardcoded in this helper."""
 
 import json
 import os
@@ -105,9 +104,12 @@ class _Pi:
         return reply
 
     def _text(self, reply):
-        return "".join(
+        text = "".join(
             b.get("text", "") for b in reply.get("content", []) if b.get("type") == "text"
         )
+        if reply.get("isError"):
+            raise PiBridgeError(text or "tool failed", reply.get("kind") or "tool")
+        return text
 
     # -- catalog -------------------------------------------------------------
 
@@ -147,66 +149,6 @@ class _Pi:
             return self._text(self._call(name, params))
 
         return call
-
-    # -- typed sugar for the 7 built-ins (param names match pi's schemas) ----
-
-    def read(self, path, offset=None, limit=None):
-        """Read a file. Returns clean text; paging hints live in pi.raw(...) details."""
-        params = {"path": path}
-        if offset is not None:
-            params["offset"] = offset
-        if limit is not None:
-            params["limit"] = limit
-        return self._text(self._call("read", params))
-
-    def bash(self, command, timeout=None):
-        """Run a shell command in the session cwd. Raises on non-zero exit."""
-        params = {"command": command}
-        if timeout is not None:
-            params["timeout"] = timeout
-        reply = self._call("bash", params)
-        text = self._text(reply)
-        details = reply.get("details") or {}
-        if reply.get("isError") or int(details.get("exitCode") or 0) != 0:
-            raise PiBridgeError(text or "command failed (exit %s)" % details.get("exitCode"), "tool")
-        return text
-
-    def write(self, path, content):
-        """Write a file (creates parent directories, overwrites)."""
-        return self._text(self._call("write", {"path": path, "content": content}))
-
-    def edit(self, path, edits):
-        """Exact-match edits: [(old_text, new_text), ...] or {"oldText", "newText"} dicts."""
-        normalized = [
-            e if isinstance(e, dict) else {"oldText": e[0], "newText": e[1]} for e in edits
-        ]
-        return self._text(self._call("edit", {"path": path, "edits": normalized}))
-
-    def grep(self, pattern, path=None, glob=None, ignoreCase=False, literal=False, context=None, limit=None):
-        """Search file contents; respects .gitignore."""
-        params = {"pattern": pattern}
-        for key, value in (("path", path), ("glob", glob), ("context", context), ("limit", limit)):
-            if value is not None:
-                params[key] = value
-        if ignoreCase:
-            params["ignoreCase"] = True
-        if literal:
-            params["literal"] = True
-        return self._text(self._call("grep", params))
-
-    def ls(self, path=None, limit=None):
-        """List a directory (default: cwd)."""
-        params = {k: v for k, v in (("path", path), ("limit", limit)) if v is not None}
-        return self._text(self._call("ls", params))
-
-    def find(self, pattern, path=None, limit=None):
-        """Find files by glob pattern; respects .gitignore."""
-        params = {"pattern": pattern}
-        if path is not None:
-            params["path"] = path
-        if limit is not None:
-            params["limit"] = limit
-        return self._text(self._call("find", params))
 
     def raw(self, tool, **params):
         """Call any tool; returns the full reply dict (content, details, isError)."""

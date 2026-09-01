@@ -88,8 +88,8 @@ describe("FR-011: python helper against the TS server", () => {
 	});
 	afterAll(() => server.stop());
 
-	test("typed sugar: pi.read returns the finished text", async () => {
-		const r = await runPython(socketPath, `print(json.dumps({"text": pi.read("f.txt")}))`);
+	test("generic dispatch: pi.read returns the finished text", async () => {
+		const r = await runPython(socketPath, `print(json.dumps({"text": pi.read(path="f.txt")}))`);
 		expect(r.err).toBe("");
 		expect(JSON.parse(r.out).text).toBe('ran read with {"path":"f.txt"}');
 	});
