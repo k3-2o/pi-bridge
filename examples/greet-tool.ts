@@ -1,15 +1,20 @@
-// The classic way to give pi a tool: defineTool(), then register the product in
-// code (customTools: [myTool] in the SDK, or pi.registerTool() in an extension).
+// pi's usual custom-tool flow exports nothing: you define the tool inline
+// (defineTool) and hand it straight to customTools / pi.registerTool. The
+// object lives inside your file and pi's session; there is nothing to import,
+// so a manifest cannot reach it.
 //
-// pi-bridge mounts the SAME kind of tool from the YAML manifest instead: the
-// module exports a factory, the bridge calls it once at mount, and the result
-// is indistinguishable from a registered tool in the catalog.
+// The SDK built-ins are the exception everyone knows: createReadTool,
+// createBashTool and friends ARE exported factories, which is exactly why a
+// manifest can mount them by name.
+//
+// To use your own tool over pi-bridge, make it exportable the same way: keep
+// the defineTool call and the typebox schema exactly as pi prescribes, and wrap
+// it in an exported factory. One export is the whole difference.
 //
 // Mount:
 //   - from: "~/my-tools/greet-tool.ts"   # or ./greet-tool.ts relative to the manifest
 //     factory: createGreetTool
 
-import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 export function createGreetTool() {
