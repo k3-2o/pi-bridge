@@ -86,7 +86,10 @@ product's shape: a string `name` and an async `execute` that takes
 `(toolCallId, params, signal, onUpdate, ctx)` and returns content blocks. That
 is the exact contract pi's own SDK tools follow (`createReadTool`, `createBashTool`
 and friends), which is why SDK tools and your own tools mount through the same
-line of YAML and become indistinguishable in the catalog.
+line of YAML and become indistinguishable in the catalog. `greet-tool.ts` below
+is even written with pi's own `defineTool()` + typebox, the pattern the SDK docs
+prescribe for `customTools` / `pi.registerTool()`: the bridge changes how a tool
+is mounted, never how it is written.
 
 `examples/greet-tool.ts` is a complete one:
 
