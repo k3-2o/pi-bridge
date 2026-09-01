@@ -63,7 +63,6 @@ export default function (pi: ExtensionAPI): void {
 			tools: () => tools,
 			registry: () => registry,
 			ctx,
-			getModel: () => (ctx as unknown as { getModel?: () => unknown }).getModel?.(),
 		});
 		socketPath ??= join(pickSocketDir(), `pi-bridge-${process.pid}.sock`);
 		server.start(socketPath);

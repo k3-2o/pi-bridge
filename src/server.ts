@@ -43,9 +43,6 @@ export interface BridgeServerOptions {
 	registry?: () => Map<string, RegistryEntry>;
 	/** Execution context passed to tool.execute; real one arrives in session_start. */
 	ctx?: object;
-	/** Live current-model accessor (ctx.getModel) — read per call so tools see the
-	 * session's model exactly when it changes, not the session_start snapshot. */
-	getModel?: () => unknown;
 }
 
 const CTX_SHIM = {
@@ -315,25 +312,12 @@ export class BridgeServer {
 			}, seconds * 1000);
 		}
 		try {
-			// Native parity: the tool sees the session's CURRENT model per call — pi
-			// resolves it after session_start, so the captured ctx snapshot goes stale.
-			const live = this.opts.ctx ?? CTX_SHIM;
-			const opts = this.opts;
-			const getModel = opts.getModel;
-			const execCtx = getModel
-				? new Proxy(live, {
-						get(target, prop, receiver) {
-							if (prop === "model") return getModel() ?? Reflect.get(target, prop, receiver);
-							return Reflect.get(target, prop, receiver);
-						},
-					})
-				: live;
 			const result = await mounted.tool.execute(
 				req.id,
 				req.params ?? {},
 				ac.signal,
 				undefined,
-				execCtx,
+				this.opts.ctx ?? CTX_SHIM,
 			);
 			// FR-009: the wire carries the FINISHED text as one clean block — the helper
 			// returns it as-is. Truncation/image hints ride in details.
