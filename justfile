@@ -24,5 +24,8 @@ ci: fmt lint check test
 smoke:
     bun -e 'await import("./index.ts"); console.log("smoke: src imports clean")'
 
+e2e:
+    bun run scripts/e2e.ts
+
 clean:
     rm -rf node_modules .pytest_cache 2>/dev/null; rm -f bun.lock 2>/dev/null; true
