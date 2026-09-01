@@ -37,11 +37,15 @@ export default function (pi: ExtensionAPI): void {
 	// race-free with kernel spawn.
 	pi.on("session_start", async (_event, ctx) => {
 		const manifest = await readManifest();
-		for (const line of manifest.diagnostics) console.error(line);
-
 		const loaded = await loadTools(manifest.entries, ctx.cwd);
-		for (const line of loaded.diagnostics) console.error(line);
 		tools = loaded.tools;
+
+		// Problems surface as pi notifications; a clean manifest stays silent (no stderr noise).
+		if (ctx.hasUI) {
+			for (const line of [...manifest.diagnostics, ...loaded.diagnostics]) {
+				ctx.ui.notify(line, "warning");
+			}
+		}
 
 		try {
 			registry.clear();
@@ -67,7 +71,7 @@ export default function (pi: ExtensionAPI): void {
 		socketPath ??= join(pickSocketDir(), `pi-bridge-${process.pid}.sock`);
 		server.start(socketPath);
 		process.env[BRIDGE_ENV] = socketPath;
-		console.error(`[pi-bridge] serving ${tools.size} tools at ${socketPath}`);
+		if (ctx.hasUI) ctx.ui.notify(`pi-bridge: ${tools.size} tools ready`, "info");
 	});
 
 	pi.on("session_shutdown", async () => {
