@@ -8,7 +8,8 @@
 		"skipLibCheck": true,
 		"noUncheckedIndexedAccess": true,
 		"forceConsistentCasingInFileNames": true,
-		"verbatimModuleSyntax": true
+		"verbatimModuleSyntax": true,
+		"allowImportingTsExtensions": true
 	},
 	"include": ["src", "test"]
 }

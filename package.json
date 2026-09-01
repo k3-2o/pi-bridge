@@ -4,12 +4,13 @@
 	"type": "module",
 	"private": true,
 	"license": "MIT",
-	"description": "Expose pi's real tools to the repl kernel over a local socket \u2014 manifest-driven, transport-invisible.",
+	"description": "Expose pi's real tools to the repl kernel over a local socket — manifest-driven, transport-invisible.",
 	"scripts": {
 		"test": "bun test"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
+		"@earendil-works/pi-coding-agent": "^0.84.4",
 		"@types/bun": "^1.2.0",
 		"typescript": "^5.6.0"
 	}
