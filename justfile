@@ -14,6 +14,7 @@ lint:
 
 check:
     bunx tsc --noEmit
+    python3 -m py_compile examples/bridge.py
 
 test:
     bun test --pass-with-no-tests

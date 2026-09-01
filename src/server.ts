@@ -36,7 +36,7 @@ export interface RegistryEntry {
 }
 
 export interface BridgeServerOptions {
-	socketPath: string;
+	socketPath?: string;
 	/** Live tools lookup — the index rebinds per session cwd without a server restart. */
 	tools: () => Map<string, MountedTool>;
 	/** pi registry metadata (descriptions, sourceInfo) for catalog replies. */
@@ -111,30 +111,39 @@ interface Flight {
 
 export class BridgeServer {
 	private server: net.Server | undefined;
+	private activePath: string | undefined;
 	private readonly connections = new Set<net.Socket>();
 	private readonly inFlight = new Map<string, Flight>();
 
 	constructor(private readonly opts: BridgeServerOptions) {}
 
-	start(): void {
+	start(socketPath?: string): void {
 		if (this.server) return;
-		sweepStaleSockets(dirname(this.opts.socketPath), process.pid);
-		rmSync(this.opts.socketPath, { force: true });
+		const path = socketPath ?? this.opts.socketPath;
+		if (!path) throw new Error("[pi-bridge] start() called without a socket path");
+		sweepStaleSockets(dirname(path), process.pid);
+		rmSync(path, { force: true });
 		const server = net.createServer((conn) => this.handle(conn));
 		server.unref(); // never keep pi alive on its own
 		server.on("error", (err) => console.error("[pi-bridge] server:", err));
-		server.listen(this.opts.socketPath, () => {
+		server.listen(path, () => {
 			try {
-				chmodSync(this.opts.socketPath, 0o600);
+				chmodSync(path, 0o600);
 			} catch {
 				/* best effort; same-user socket */
 			}
 		});
 		this.server = server;
+		this.activePath = path;
 	}
 
 	get started(): boolean {
 		return this.server !== undefined;
+	}
+
+	/** The socket actually in use (differs from opts when start() took a path). */
+	get path(): string | undefined {
+		return this.activePath;
 	}
 
 	stop(): void {
@@ -147,7 +156,8 @@ export class BridgeServer {
 		this.connections.clear();
 		this.server?.close();
 		this.server = undefined;
-		rmSync(this.opts.socketPath, { force: true });
+		if (this.activePath) rmSync(this.activePath, { force: true });
+		this.activePath = undefined;
 	}
 
 	private write(conn: net.Socket, reply: Reply): void {
