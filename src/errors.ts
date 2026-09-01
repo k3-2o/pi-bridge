@@ -84,6 +84,12 @@ export class TransportLostError extends Error {
 	}
 }
 
+/** File-level manifest diagnostics (FR-002 rows 1-3): the whole file failed; the
+ * bridge boots with an empty surface and this one line explains where and why. */
+export function manifestFileDiagnostic(path: string, reason: string): string {
+	return `[pi-bridge] manifest ${path}: ${reason}`;
+}
+
 /** Manifest diagnostics (FR-002): never thrown at a cell — logged, that entry skipped. */
 export class BridgeConfigError extends Error {
 	readonly kind = "config" as const;
