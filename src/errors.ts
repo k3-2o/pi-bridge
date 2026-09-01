@@ -1,7 +1,4 @@
-// Error taxonomy (SPEC §4): config errors are logged+skipped at load, arg errors
-// repeat pi's verbatim schema message, tool errors pass through untouched, and
-// transport errors exist only as FR-008's single mid-call-loss message. Cells can
-// never see any other transport text (SC-004).
+// Error taxonomy (SPEC §4): arg/tool errors pass pi's own text; transport errors are only FR-008's one message (SC-004).
 
 export type ErrorKind =
 	| "protocol"

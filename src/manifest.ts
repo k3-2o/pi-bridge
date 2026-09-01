@@ -1,7 +1,4 @@
-// Manifest loading + validation (FR-001/FR-002). Pure parse/validate: this module
-// never imports tool files — that is loader.ts's job. Duplicate final tool names are
-// detected at mount time (loader.ts), because real tool names materialize only when
-// factories run; name-override collisions are caught here.
+// Manifest parse/validate (FR-001/FR-002); never imports tool files — loader.ts does that.
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

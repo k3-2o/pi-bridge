@@ -267,7 +267,7 @@ describe("FR-007: calls", () => {
 		const reply = await c.next();
 		expect(reply.ok).toBe(true);
 		const content = reply.content as Array<{ text?: string }>;
-		expect(content[0]?.text).toBe("hi"); // ANSI stripped host-side
+		expect(content[0]?.text).toBe("hi");
 		server.stop();
 		c.destroy();
 	});
@@ -336,7 +336,7 @@ describe("FR-007: calls", () => {
 		c.send({ v: 1, op: "call", id: "s1", tool: "slow", params: {} });
 		c.send({ v: 1, op: "call", id: "s2", tool: "slow", params: {} });
 		await new Promise((r) => setTimeout(r, 30));
-		expect(deferred).toHaveLength(2); // both in flight at once
+		expect(deferred).toHaveLength(2);
 		deferred[1]?.resolve({ content: [{ type: "text", text: "two" }] });
 		deferred[0]?.resolve({ content: [{ type: "text", text: "one" }] });
 		const ids = new Set([(await c.next()).id, (await c.next()).id]);

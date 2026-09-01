@@ -1,9 +1,6 @@
-// pi-bridge: expose pi's real tools to the repl kernel over a unix socket.
-// Standalone companion to pi-repl-py — zero changes to that package. The repo root
-// IS the extension: pi loads extensions/<this-dir>/index.ts natively (T003 smoke).
-//
-// Activation gate mirrors pi-repl-py's own: getFlag() is scoped to flags the calling
-// extension itself registered, so argv/PI_REPL_FORCE is the only reliable read (v1 lesson).
+// The repo root IS the extension (pi loads extensions/<dir>/index.ts); companion to
+// pi-repl-py, zero changes to it. Gate: getFlag() is scoped to own flags, so
+// argv/PI_REPL_FORCE is the reliable read (v1 lesson).
 
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -27,14 +24,11 @@ export default function (pi: ExtensionAPI): void {
 
 	let server: BridgeServer | undefined;
 	let socketPath: string | undefined;
-	// Holder indirection: the server's tools() getter always reads the CURRENT map,
-	// so a session_start rebind (new cwd) needs no server restart.
+	// tools() reads the CURRENT map, so a session_start rebind needs no server restart.
 	let tools = new Map<string, MountedTool>();
 	const registry = new Map<string, RegistryEntry>();
 
-	// Global extensions load before packages, so this handler runs before
-	// pi-repl-py's session_start (which spawns the kernel): socket + env var are
-	// race-free with kernel spawn.
+	// Global extensions load before packages: socket + env var are race-free with kernel spawn.
 	pi.on("session_start", async (_event, ctx) => {
 		const manifest = await readManifest();
 		for (const line of manifest.diagnostics) console.error(line);

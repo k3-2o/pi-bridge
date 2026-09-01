@@ -1,8 +1,5 @@
 import { chmodSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-// The bridge server (FR-004..FR-008, FR-010): owns the socket lifecycle, the
-// handshake, and dispatch. Transport is invisible by construction — the only
-// errors that leave this file are tool-arg errors, tool failures, timeouts, and
-// the single mid-call transport message (FR-008).
+// Bridge server (FR-004..FR-010): socket lifecycle, handshake, dispatch; only tool-shaped errors and FR-008's one message leave.
 import net from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -91,9 +88,7 @@ export function sweepStaleSockets(dir: string, ownPid: number): void {
 		try {
 			process.kill(pid, 0); // signal 0 = existence probe
 		} catch {
-			alive = false; // ESRCH = dead; EPERM would be alive-but-other-user and throws too, but
-			// a socket naming another user's pid is not ours to judge — still, dead is the only
-			// state we remove, and EPERM pids are alive, so keep the conservative mapping.
+			alive = false; // ESRCH = dead; EPERM = alive-but-other-user, keep those
 		}
 		if (alive) continue;
 		try {
@@ -173,7 +168,7 @@ export class BridgeServer {
 		this.connections.add(conn);
 		let handshook = false;
 		const splitter = new FrameSplitter();
-		const local = new Set<string>(); // call ids in flight on THIS connection
+		const local = new Set<string>(); // ids in flight on this connection
 		conn.on("data", (chunk: Buffer) => {
 			for (const line of splitter.feed(chunk.toString("utf8"))) {
 				if (!handshook) {
@@ -184,7 +179,7 @@ export class BridgeServer {
 			}
 		});
 		conn.on("close", () => {
-			// FR-007 row 6: a dropped connection aborts its in-flight tools (Esc semantics).
+			// FR-007 row 6: a dropped connection aborts its in-flight tools.
 			this.connections.delete(conn);
 			for (const id of local) {
 				const flight = this.inFlight.get(id);
@@ -319,8 +314,7 @@ export class BridgeServer {
 				undefined,
 				this.opts.ctx ?? CTX_SHIM,
 			);
-			// FR-009: the wire carries the FINISHED text as one clean block — the helper
-			// returns it as-is. Truncation/image hints ride in details.
+			// FR-009: finished text on the wire; truncation/image hints ride in details.
 			const formatted = formatResult(result);
 			this.write(
 				conn,
@@ -341,7 +335,7 @@ export class BridgeServer {
 					),
 				);
 			} else if (conn.destroyed) {
-				// FR-008: client is gone — nothing to say to anyone; the abort already fired.
+				// FR-008: client gone — the abort already fired.
 			} else if (err instanceof Error && err.name === "AbortError") {
 				this.write(conn, makeError(req.id, "transport", TRANSPORT_LOST_MESSAGE));
 			} else {

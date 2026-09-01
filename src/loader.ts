@@ -1,8 +1,6 @@
 import { BridgeConfigError } from "./errors.ts";
 import type { ManifestEntry } from "./manifest.ts";
-// Tool loading (FR-003): import each manifest entry, call its factory, verify the
-// product's shape, mount under its final name. Every failure is per-entry: one bad
-// factory never prevents the others from mounting (FR-002 rows 5-8).
+// Tool loading (FR-003): import, call factory, verify shape; a bad entry never blocks the others.
 import type { BridgeTool } from "./protocol.ts";
 
 export interface MountedTool {

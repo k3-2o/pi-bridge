@@ -1,12 +1,6 @@
-// E2E gate (SPEC exit criterion) — FULLY ISOLATED.
-// pi boots with HOME pointed at a throwaway temp dir, so it can only see the
-// extensions, manifest, and sockets this script installs there. The user's real
-// ~/.pi is never read or written, and the only process this script ever kills is
-// the pi child it spawned itself (by pid, never by name).
-//
-// Coverage: install → boot → catalog parity (10 tools) → real read/write/bash
-// through pi → unknown-tool error → chaos manifest (broken entries diagnosed,
-// survivors mounted) → SIGKILL leftover swept by next boot.
+// E2E gate (SPEC exit criterion), FULLY ISOLATED: pi boots in a throwaway HOME;
+// the only process ever killed is the pi child this script spawned (by pid).
+// Coverage: install, boot, catalog, real calls, unknown-tool, chaos, sweep.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -29,16 +23,14 @@ async function waitUntil(fn: () => boolean, ms: number): Promise<boolean> {
 	return fn();
 }
 
-// pi's launcher resolves its global install relative to $HOME — under an isolated
-// HOME it cannot find itself. Spawn the real cli.js under bun instead.
+// Under an isolated HOME pi's launcher can't find itself; spawn the real cli.js via bun.
 const PI_CLI = join(
 	process.env.HOME ?? "/root",
 	".bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/bun/cli.js",
 );
 
 function bootPi(env: NodeJS.ProcessEnv, runDir: string) {
-	// stdin MUST stay open: rpc mode shuts down gracefully on EOF (which would
-	// remove the socket seconds after boot). We never write; kill9 ends it.
+	// stdin MUST stay open: rpc mode shuts down on EOF; kill9 ends it.
 	const proc = Bun.spawn(["bun", PI_CLI, "--mode", "rpc"], {
 		env: { ...process.env, ...env },
 		stdin: "pipe",
@@ -62,8 +54,7 @@ function kill9(boot: { proc: { pid: number | undefined } }): void {
 	}
 }
 
-// The shipped helper is gone (clients are out of scope); the e2e still proves the
-// wire contract cross-language with this stdlib-only raw client.
+// No helper ships; this stdlib raw client proves the wire contract cross-language.
 const XCHG = [
 	"import json, os, socket, uuid",
 	"s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)",
@@ -83,7 +74,7 @@ const XCHG = [
 ];
 
 async function main(): Promise<void> {
-	// 0. isolated home — pi can only ever see this tree
+	// 0. isolated home
 	const e2eHome = mkdtempSync(join(tmpdir(), "pi-bridge-e2e-home-"));
 	const agent = join(e2eHome, ".pi", "agent");
 	const extDir = join(agent, "extensions", "pi-bridge");
@@ -91,7 +82,7 @@ async function main(): Promise<void> {
 	const runDir = join(bridgeDir, "run");
 	const manifest = join(bridgeDir, "tools.yml");
 	try {
-		// 1. install extension (repo root IS the extension)
+		// 1. install extension
 		mkdirSync(extDir, { recursive: true });
 		spawnSync("cp", ["-R", join(REPO, "index.ts"), join(extDir, "index.ts")]);
 		spawnSync("cp", ["-R", join(REPO, "src"), join(extDir, "src")]);
@@ -100,8 +91,7 @@ async function main(): Promise<void> {
 			existsSync(join(extDir, "index.ts")) && existsSync(join(extDir, "src/server.ts")),
 		);
 
-		// 2. manifest: 7 SDK tools + 3 of the user's exportable extension tools
-		//    (absolute paths — the isolated home has no extensions of its own)
+		// 2. manifest: 7 SDK + 3 user tools (absolute paths; isolated home has none)
 		mkdirSync(bridgeDir, { recursive: true });
 		mkdirSync(runDir, { recursive: true });
 		const userExt = join(process.env.HOME ?? homedir0(), ".pi/agent/extensions");
@@ -119,7 +109,7 @@ async function main(): Promise<void> {
 			);
 		writeFileSync(manifest, `version: 1\ntools:\n${entries.join("\n")}\n`);
 
-		// 4. boot 1 — catalog parity + real tools
+		// 4. boot 1 — catalog + real calls
 		const boot1 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		const up = await waitUntil(() => existsSync(boot1.socketPath), 60_000);
 		check("boot: socket in isolated run dir", up, boot1.socketPath);
@@ -208,8 +198,7 @@ async function main(): Promise<void> {
 		kill9(boot1); // SIGKILL: no cleanup chance — sets up the sweep test
 		const log1 = await boot1.stderr();
 
-		// 5. chaos boot — broken entries diagnosed on stderr, survivors proven via catalog
-		// (the startup banner is a ui.notify now, so survivors must be asserted live)
+		// 5. chaos boot — broken entries diagnosed on stderr, survivors via catalog
 		writeFileSync(
 			manifest,
 			`${await Bun.file(manifest).text()}  - from: "./does-not-exist.ts"\n    factory: createGhost\n  - from: "@earendil-works/pi-coding-agent"\n    factory: notExportedAnywhere\n`,
@@ -270,7 +259,7 @@ async function main(): Promise<void> {
 			JSON.stringify(socketsAfter2),
 		);
 
-		// 6. sweep: next boot removes dead-pid sockets
+		// 6. sweep
 		const boot3 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		const swept = await waitUntil(() => {
 			const socks = readdirSync(runDir).filter((f) => f.endsWith(".sock"));
@@ -279,7 +268,7 @@ async function main(): Promise<void> {
 		check("sweep: only the new boot's socket remains", swept, JSON.stringify(readdirSync(runDir)));
 		kill9(boot3);
 	} finally {
-		rmSync(e2eHome, { recursive: true, force: true }); // the whole isolated home vanishes
+		rmSync(e2eHome, { recursive: true, force: true }); // throwaway home vanishes
 	}
 
 	// 7. verdict

@@ -1,10 +1,7 @@
-// Host-side formatting (FR-009): the server emits finished text — the helper never
-// cleans anything. Truncation notices become machine hints in details; images stay
-// host-side, counted in details.
+// Host-side formatting (FR-009): finished text out, hints in details, images stay host-side.
 import type { ContentBlock, ToolExecutionResult } from "./protocol.ts";
 
-// Raw tool output can carry ANSI escapes (color, hyperlinks) and stray carriage
-// returns from progress bars; none of that survives the bridge.
+// Raw tool output can carry ANSI escapes and stray CRs; none survive this.
 const ANSI_RE = new RegExp(
 	[
 		String.raw`\x1b\[[0-9;?]*[ -/]*[@-~]`, // CSI sequences
@@ -14,8 +11,7 @@ const ANSI_RE = new RegExp(
 );
 const LONE_CR_RE = String.raw`\r(?!\n)`;
 
-// pi's reader appends a bracketed paging notice to truncated output; right for a
-// transcript, poison for a cell that json.loads() the text. Strip it, keep the hint.
+// Reader walks back the paging notice on truncated output; strip it, keep the hint in details.
 const READER_NOTICE_RE = /\[(\d+) more lines? in file\. Use offset=(\d+)[^\]]*\]\s*$/;
 
 export interface FormattedResult {

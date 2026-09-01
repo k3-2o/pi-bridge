@@ -1,6 +1,4 @@
-// Wire protocol v1 (SPEC FR-005/FR-007): JSONL over a Unix socket, LF-delimited.
-// First line on connect is the ping/pong handshake; every reply carries the
-// protocol version so mismatched sides fail loudly instead of weirdly.
+// Wire protocol v1 (FR-005/FR-007): LF-delimited JSONL, ping/pong handshake, versioned replies.
 import type { ErrorKind } from "./errors.ts";
 
 export const PROTOCOL_VERSION = 1;
