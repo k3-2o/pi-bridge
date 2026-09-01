@@ -80,49 +80,21 @@ The catalog only shows what mounted.
 
 ### What "exportable" means
 
-`factory` is the name of a function the module named by `from:` must export.
-At mount the bridge imports that module, calls the function once, and checks the
-product's shape: a string `name` and an async `execute` that takes
-`(toolCallId, params, signal, onUpdate, ctx)` and returns content blocks. That
-is the exact contract pi's own SDK tools follow (`createReadTool`, `createBashTool`
-and friends), which is why SDK tools and your own tools mount through the same
-line of YAML and become indistinguishable in the catalog. `greet-tool.ts` below
-is even written with pi's own `defineTool()` + typebox, the pattern the SDK docs
-prescribe for `customTools` / `pi.registerTool()`: the bridge changes how a tool
-is mounted, never how it is written.
-
-`examples/greet-tool.ts` is a complete one:
-
-```ts
-export function createGreetTool() {
-	return {
-		name: "greet",
-		parameters: {
-			type: "object",
-			properties: { name: { type: "string" } },
-			required: ["name"],
-		},
-		async execute(_toolCallId, params) {
-			return { content: [{ type: "text", text: `hello, ${params.name}` }] };
-		},
-	};
-}
-```
-
-Mount it with:
+Nothing about pi changes. Write the tool the way the SDK docs prescribe
+(`defineTool`, typebox schema); the only bridge requirement is that the module
+exports a factory that returns it. Mount with two YAML lines:
 
 ```yaml
-  - from: "~/my-tools/greet.ts"
+  - from: "~/my-tools/greet-tool.ts"
     factory: createGreetTool
 ```
 
-Write it once, the pi way: mount it in code or over YAML, it is the same object.
+`parameters` gives you schema-validated args for free: bad args die with pi's
+verbatim message before your code runs. Write it once, the pi way; mount it in
+code or over YAML, it is the same object. The complete working tool:
+`examples/greet-tool.ts`.
 
-`parameters` is optional, but supply it and every call is schema-validated for
-free: bad args get pi's verbatim validation message, and the catalog derives a
-readable signature from the schema.
-
-### Examples in this repo
+## Examples in this repo
 
 - `examples/tools.yml`: a complete manifest, both `from:` rules shown
 - `examples/greet-tool.ts`: the smallest exportable tool above, ready to mount
