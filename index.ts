@@ -37,15 +37,11 @@ export default function (pi: ExtensionAPI): void {
 	// race-free with kernel spawn.
 	pi.on("session_start", async (_event, ctx) => {
 		const manifest = await readManifest();
-		const loaded = await loadTools(manifest.entries, ctx.cwd);
-		tools = loaded.tools;
+		for (const line of manifest.diagnostics) console.error(line);
 
-		// Problems surface as pi notifications; a clean manifest stays silent (no stderr noise).
-		if (ctx.hasUI) {
-			for (const line of [...manifest.diagnostics, ...loaded.diagnostics]) {
-				ctx.ui.notify(line, "warning");
-			}
-		}
+		const loaded = await loadTools(manifest.entries, ctx.cwd);
+		for (const line of loaded.diagnostics) console.error(line);
+		tools = loaded.tools;
 
 		try {
 			registry.clear();

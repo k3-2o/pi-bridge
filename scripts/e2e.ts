@@ -190,7 +190,8 @@ async function main(): Promise<void> {
 		kill9(boot1); // SIGKILL: no cleanup chance — sets up the sweep test
 		const log1 = await boot1.stderr();
 
-		// 5. chaos boot — broken entries diagnosed, survivors mounted
+		// 5. chaos boot — broken entries diagnosed on stderr, survivors proven via catalog
+		// (the startup banner is a ui.notify now, so survivors must be asserted live)
 		writeFileSync(
 			manifest,
 			`${await Bun.file(manifest).text()}  - from: "./does-not-exist.ts"\n    factory: createGhost\n  - from: "@earendil-works/pi-coding-agent"\n    factory: notExportedAnywhere\n`,
@@ -198,13 +199,51 @@ async function main(): Promise<void> {
 		const boot2 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		await waitUntil(() => existsSync(boot2.socketPath), 60_000);
 		await new Promise((r) => setTimeout(r, 300));
+		const probe2 = [
+			"import sys, json",
+			`sys.path.insert(0, ${JSON.stringify(join(REPO, "examples"))})`,
+			"from bridge import pi",
+			"print(json.dumps(sorted(t['name'] for t in pi._catalog())))",
+		].join("\n");
+		const py2 = Bun.spawn(["python3", "-c", probe2], {
+			env: { ...process.env, PI_BRIDGE_SOCK: boot2.socketPath },
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const [namesOut] = await Promise.all([
+			new Response(py2.stdout).text(),
+			new Response(py2.stderr).text(),
+		]);
+		await py2.exited;
+		let survivors: string[] = [];
+		try {
+			survivors = JSON.parse(namesOut);
+		} catch {
+			/* shown below */
+		}
+		check(
+			"chaos: 10 survivors mounted, broken entries skipped",
+			JSON.stringify(survivors) ===
+				JSON.stringify([
+					"AskUserQuestion",
+					"bash",
+					"clipboard_copy",
+					"edit",
+					"find",
+					"grep",
+					"ls",
+					"read",
+					"web_search",
+					"write",
+				]),
+			`${survivors.length} mounted: ${JSON.stringify(survivors)}`,
+		);
 		kill9(boot2);
 		const log2 = await boot2.stderr();
 		const bridgeLines = log2.split("\n").filter((l) => l.includes("[pi-bridge]"));
 		check(
-			"chaos: broken entries diagnosed, 10 survivors mounted",
-			bridgeLines.some((l) => l.includes("skipped") && l.includes("does-not-exist")) &&
-				bridgeLines.some((l) => l.includes("serving 10 tools")),
+			"chaos: broken entries diagnosed on stderr",
+			bridgeLines.some((l) => l.includes("skipped") && l.includes("does-not-exist")),
 			bridgeLines.slice(-3).join(" | "),
 		);
 		const socketsAfter2 = readdirSync(runDir).filter((f) => f.endsWith(".sock"));
