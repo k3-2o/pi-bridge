@@ -62,29 +62,41 @@ Broken entries never take the bridge down: each failure is skipped with a precis
 diagnostic (wrong path, missing export, garbage factory product, duplicate name),
 and `pi.tools()` only shows what actually mounted.
 
-## Declaring npm-installed packages
+## Declaring installed packages (npm or git)
 
-`from:` can point at any file on disk, including a package in pi's npm store.
-`pi install npm:<pkg>` drops packages at `~/.pi/agent/npm/node_modules/<pkg>/`:
+`from:` can point at any file on disk, including a package pi installed for you.
+Two layouts:
 
-```yaml
-  - from: "~/.pi/agent/npm/node_modules/@k3_2o/pi-read-image/index.ts"
-    factory: createReadImageTool
-    cwd: true
-```
+- **npm store** — `pi install npm:<pkg>` drops the package at
+  `~/.pi/agent/npm/node_modules/<pkg>/`:
 
-Two rules keep this reliable:
+  ```yaml
+    - from: "~/.pi/agent/npm/node_modules/@k3_2o/pi-read-image/index.ts"
+      factory: createReadImageTool
+      cwd: true
+  ```
+
+- **git checkout** — `pi install git:github.com/<owner>/<repo>@<ref>` clones into
+  `~/.pi/agent/git/<host>/<owner>/<repo>/` with a production install run inside
+  the checkout. Point `from:` at the checkout's entry file (same pattern). A
+  checkout with no declared dependencies may have no `node_modules` at all.
+
+One rule governs both:
 
 - **The package must ship its runtime imports as real `dependencies`** (pi's
-  documented rule for installed packages), not only `peerDependencies`. Peers are
-  never installed into the store, and the plain import chain from a store copy
-  finds only what physically sits in `~/.pi/agent/npm/node_modules`. A
-  peers-only package fails with `Cannot find package '...'` — even though the
-  identical file loads from `extensions/`, because loose files outside any npm
-  project get bun's automatic fetch, while files inside the store don't.
-- **Prefer the `~/` store path over a bare package name.** A bare token resolves
-  through bun's own machinery (it may pull a fresh copy from the registry cache
-  instead of the store you installed), so reference the file you actually have.
+  documented rule for installed packages), not only `peerDependencies`. pi's
+  production install never materializes peers, so the plain import chain from an
+  installed copy finds only what physically sits next to it. A peers-only
+  package fails with `Cannot find package '...'` — even though the identical
+  file loads from `extensions/`, because loose files outside any npm project get
+  bun's automatic fetch, while installed packages don't.
+
+And one practical preference:
+
+- **Use the `~/` path of the installed copy, not a bare package name.** A bare
+  token resolves through bun's own machinery (it may pull a fresh copy from the
+  registry cache instead of what you installed), so reference the file you
+  actually have.
 
 After adding an entry, `pi.tools()` in a fresh or `/reload`ed session shows it;
 a skipped entry always has its reason on pi's stderr at boot.
