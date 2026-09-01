@@ -1,0 +1,6 @@
+.agent/
+AGENT.md
+node_modules/
+dist/
+*.local
+.env

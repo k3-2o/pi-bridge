@@ -1,0 +1,16 @@
+{
+	"name": "pi-bridge",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"license": "MIT",
+	"description": "Expose pi's real tools to the repl kernel over a local socket \u2014 manifest-driven, transport-invisible.",
+	"scripts": {
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/bun": "^1.2.0",
+		"typescript": "^5.6.0"
+	}
+}
