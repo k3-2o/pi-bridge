@@ -94,6 +94,68 @@ export function parseRequest(line: string): BridgeRequest | null {
 	return null;
 }
 
+/** One level of array-item expansion: "edits: array" invites a wrong guess at the
+ * item shape; "edits: [{ oldText: string, newText: string }]" does not. */
+function propertyType(prop: unknown): string {
+	const p = (prop ?? {}) as {
+		type?: string;
+		enum?: unknown[];
+		items?: { properties?: Record<string, unknown>; required?: string[] };
+	};
+	if (p.type === "array" && p.items?.properties) {
+		const required = new Set(p.items.required ?? []);
+		const fields = Object.entries(p.items.properties)
+			.map(([name, item]) => `${name}${required.has(name) ? "" : "?"}: ${propertyType(item)}`)
+			.join(", ");
+		return `[{ ${fields} }]`;
+	}
+	if (Array.isArray(p.enum) && p.enum.length > 0) {
+		return p.enum.map((value) => JSON.stringify(value)).join(" | ");
+	}
+	return p.type ?? "unknown";
+}
+
+/** pi.read({ path: string, offset?: number, limit?: number }) — schema-derived, never drifts. */
+export function toolSignature(name: string, schema: unknown): string {
+	const s = (schema ?? {}) as {
+		required?: string[];
+		properties?: Record<string, unknown>;
+	};
+	const required = new Set(s.required ?? []);
+	const params = Object.entries(s.properties ?? {})
+		.map(
+			([propName, prop]) =>
+				`${propName}${required.has(propName) ? "" : "?"}: ${propertyType(prop)}`,
+		)
+		.join(", ");
+	return `pi.${name}({ ${params} })`;
+}
+
+function levenshtein(a: string, b: string): number {
+	const dist: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
+		Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+	);
+	for (let i = 1; i <= a.length; i++) {
+		for (let j = 1; j <= b.length; j++) {
+			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+			const row = dist[i] ?? [];
+			const prev = dist[i - 1] ?? [];
+			row[j] = Math.min((row[j - 1] ?? 0) + 1, (prev[j] ?? 0) + 1, (prev[j - 1] ?? 0) + cost);
+		}
+	}
+	return dist[a.length]?.[b.length] ?? 0;
+}
+
+/** Closest candidate within edit distance 3, for "did you mean" suggestions. */
+export function nearestName(name: string, candidates: Iterable<string>): string | undefined {
+	let best: { name: string; distance: number } | undefined;
+	for (const candidate of candidates) {
+		const distance = levenshtein(name.toLowerCase(), candidate.toLowerCase());
+		if (!best || distance < best.distance) best = { name: candidate, distance };
+	}
+	return best && best.distance <= 3 ? best.name : undefined;
+}
+
 export function encodeFrame(msg: unknown): string {
 	return `${JSON.stringify(msg)}\n`;
 }

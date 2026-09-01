@@ -4,6 +4,7 @@
 // never see any other transport text (SC-004).
 
 export type ErrorKind =
+	| "protocol"
 	| "unknown_tool"
 	| "args"
 	| "tool"
