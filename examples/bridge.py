@@ -11,6 +11,15 @@ carrying pi's own message. Sequence work as small focused pi calls instead of
 one monolithic cell.
 """
 
+# The model contract: pi-repl-py extracts this verbatim as the tool description.
+helper_description = """pi — pi's real tools from the repl, over the pi-bridge bridge:
+pi.tools() — start here: lists every callable tool with signatures.
+pi.read/bash/write/edit/grep/ls/find — pi's native tools with pi's own semantics.
+pi.web_search(query, intent), pi.clipboard_copy(text), pi.AskUserQuestion(...) — extension tools declared in the manifest.
+pi.raw(tool, **params) — full reply dict; details carry truncation hints (truncated, nextOffset).
+Treat each pi.* call as a real tool call: args are schema-validated, failures raise PiBridgeError with pi's message.
+The manifest (~/.pi/agent/pi-bridge/tools.yml) defines the surface — anything declared there is callable as pi.<name>()."""
+
 import json
 import os
 import socket
