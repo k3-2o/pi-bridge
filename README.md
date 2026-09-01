@@ -1,23 +1,26 @@
 # pi-bridge
 
-Call pi's real tools from Python cells inside the pi repl, over a local unix
-socket.
+A companion to the pi-repl-py extension. pi-repl-py swaps all of pi's tools for
+one: a Python kernel. You write Python in the repl; the model steps aside. But
+the kernel is just a process, and pi's tools (read, bash, edit, the rest) live
+behind a wall it cannot cross.
 
-The model in your repl already has read, bash, edit, and the rest: schema
-validation, shaped output, real errors. Cells get the same path. pi-bridge loads
-pi's own tool implementations behind a small server and serves them over a
-socket; nothing is reimplemented in Python.
+pi-bridge opens that wall. It is a second extension that loads pi's real tool
+implementations and serves them over a local unix socket. Your Python calls
+read and gets exactly what the model would get: same schema validation, same
+host-side formatting, same errors. Nothing is reimplemented in Python.
 
-Clients are project-specific, so none ships here. The socket speaks three ops,
-ping, catalog, call, newline-framed JSON (see `src/protocol.ts`). A helper for
-your tool subset is about a hundred lines of stdlib Python. The manifest decides
-what exists; the engine stays tool-name-blind.
+A manifest (`~/.pi/agent/pi-bridge/tools.yml`) decides which tools exist and
+where they come from; the engine is tool-name-blind, so adding one is a YAML
+line. Helpers are per-project, and none ships here: the wire protocol is three
+ops (ping, catalog, call; newline-framed JSON, see `src/protocol.ts`), and a
+helper for your subset is about a hundred lines of stdlib Python.
 
 ```mermaid
 flowchart LR
-    cell["python cell"] --> client["your client helper (project-local)"]
-    client -- "JSONL over unix socket" --> server["pi-bridge extension (in pi)"]
-    server --> tools["pi's real tools + your exportable ones"]
+    code["your Python, in the pi-repl-py kernel"] --> helper["your helper module"]
+    helper -- "JSONL over unix socket" --> bridge["pi-bridge extension (inside pi)"]
+    bridge --> tools["pi's real tools + your exportable ones"]
 ```
 
 ## How it works
@@ -29,11 +32,11 @@ flowchart LR
   pi's real tool factories, run a JSONL server, validate every call against the
   tool's real schema, execute with pi's real context, and format output
   host-side.
-- **Clients are disposable.** Read `PI_BRIDGE_SOCK`, handshake, return text
+- **Helpers are disposable.** Read `PI_BRIDGE_SOCK`, handshake, return text
   as-is. That is the whole job. Formatting, error shaping, and transport
   reliability happen inside pi, once, for every client.
 
-Cells only ever see three kinds of failure: pi's verbatim schema errors, the
+Kernel code only ever sees three kinds of failure: pi's verbatim schema errors, the
 tool's own failure text, or one loud message when the socket dies mid-call.
 That last one is the honest catch: the call may have executed, so blind retries
 are wrong. Connect-phase races are retried invisibly. Nothing else about the
@@ -71,13 +74,13 @@ the catalog op lists what the manifest mounted. First boot creates
 | `tools[].timeout` | no | per-tool call timeout in seconds |
 
 Broken entries never take the bridge down: each failure is skipped with a precise
-diagnostic (wrong path, missing export, garbage factory product, duplicate name),
-and the catalog only shows what mounted.
+diagnostic: wrong path, missing export, garbage factory product, duplicate name.
+The catalog only shows what mounted.
 
 ## Declaring installed packages (npm or git)
 
-`from:` can point at any file on disk, including a package pi installed for you.
-Two layouts:
+`from:` can point at any file on disk. That includes a package pi installed for
+you. Two layouts:
 
 - **npm store**: `pi install npm:<pkg>` drops the package at
   `~/.pi/agent/npm/node_modules/<pkg>/`:
@@ -122,7 +125,7 @@ a skipped entry always has its reason on pi's stderr at boot.
 
 Errors arrive shaped: pi's verbatim schema message for bad args, the tool's own
 message for failures, one loud message on mid-call connection loss. A reference
-client lives in git history: `git log --diff-filter=D -- examples/bridge.py`.
+helper lives in git history: `git log --diff-filter=D -- examples/bridge.py`.
 
 ## Troubleshooting
 
