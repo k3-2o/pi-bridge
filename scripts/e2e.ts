@@ -62,6 +62,26 @@ function kill9(boot: { proc: { pid: number | undefined } }): void {
 	}
 }
 
+// The shipped helper is gone (clients are out of scope); the e2e still proves the
+// wire contract cross-language with this stdlib-only raw client.
+const XCHG = [
+	"import json, os, socket, uuid",
+	"s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)",
+	's.connect(os.environ["PI_BRIDGE_SOCK"])',
+	"def xchg(obj):",
+	"    s.sendall(json.dumps(obj).encode() + chr(10).encode())",
+	'    buf = b""',
+	"    while not buf.endswith(chr(10).encode()):",
+	"        chunk = s.recv(65536)",
+	"        if not chunk:",
+	'            raise SystemExit("connection closed")',
+	"        buf += chunk",
+	"    return json.loads(buf.decode())",
+	"def text(r):",
+	'    return "".join(b.get("text", "") for b in r.get("content", []) if b.get("type") == "text")',
+	'xchg({"v": 1, "op": "ping"})',
+];
+
 async function main(): Promise<void> {
 	// 0. isolated home — pi can only ever see this tree
 	const e2eHome = mkdtempSync(join(tmpdir(), "pi-bridge-e2e-home-"));
@@ -70,7 +90,6 @@ async function main(): Promise<void> {
 	const bridgeDir = join(agent, "pi-bridge");
 	const runDir = join(bridgeDir, "run");
 	const manifest = join(bridgeDir, "tools.yml");
-	const helperPath = join(agent, "pi-repl", "helpers", "bridge.py");
 	try {
 		// 1. install extension (repo root IS the extension)
 		mkdirSync(extDir, { recursive: true });
@@ -100,12 +119,6 @@ async function main(): Promise<void> {
 			);
 		writeFileSync(manifest, `version: 1\ntools:\n${entries.join("\n")}\n`);
 
-		// 3. helper
-		mkdirSync(join(agent, "pi-repl", "helpers"), { recursive: true });
-		writeFileSync(helperPath, await Bun.file(join(REPO, "examples/bridge.py")).text());
-		const compile = spawnSync("python3", ["-m", "py_compile", helperPath], { encoding: "utf8" });
-		check("install: helper compiles", compile.status === 0, compile.stderr);
-
 		// 4. boot 1 — catalog parity + real tools
 		const boot1 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		const up = await waitUntil(() => existsSync(boot1.socketPath), 60_000);
@@ -114,22 +127,23 @@ async function main(): Promise<void> {
 		if (up) {
 			const probeFile = join(e2eHome, "probe.txt");
 			writeFileSync(probeFile, "e2e payload\n");
+			const call = (tool: string, params: string) =>
+				`r = xchg({"v": 1, "op": "call", "id": uuid.uuid4().hex, "tool": "${tool}", "params": ${params}})`;
 			const script = [
-				"import sys, json",
-				`sys.path.insert(0, ${JSON.stringify(join(REPO, "examples"))})`,
-				"from bridge import pi, PiBridgeError",
-				"out = {}",
-				"out['count'] = len(pi.tools().splitlines())",
-				`out['read'] = pi.read(path=${JSON.stringify(probeFile)})`,
-				`pi.write(path=${JSON.stringify(`${probeFile}.w`)}, content="cell wrote this")`,
-				`out['write'] = open(${JSON.stringify(`${probeFile}.w`)}).read()`,
-				'out["bash"] = pi.bash(command="printf hi-from-real-bash")',
-				"out['names'] = sorted(t['name'] for t in pi._catalog())",
-				"try:",
-				"    pi.no_such_tool_xyz()",
-				"    out['unknown'] = 'no error!'",
-				"except PiBridgeError as e:",
-				"    out['unknown'] = e.kind",
+				...XCHG,
+				'cat = xchg({"v": 1, "op": "catalog"})',
+				'out = {"names": sorted(b["name"] for b in cat.get("content", []) if b.get("type") == "tool")}',
+				call("read", `{"path": ${JSON.stringify(probeFile)}}`),
+				'out["read"] = text(r)',
+				call(
+					"write",
+					`{"path": ${JSON.stringify(`${probeFile}.w`)}, "content": "cell wrote this"}`,
+				),
+				`out["write"] = open(${JSON.stringify(`${probeFile}.w`)}).read()`,
+				call("bash", '{"command": "printf hi-from-real-bash"}'),
+				'out["bash"] = text(r)',
+				call("no_such_tool_xyz", "{}"),
+				'out["unknown"] = r.get("kind")',
 				"print(json.dumps(out))",
 			].join("\n");
 			const py = Bun.spawn(["python3", "-c", script], {
@@ -148,10 +162,14 @@ async function main(): Promise<void> {
 			} catch {
 				/* shown below */
 			}
-			if (res.count === undefined) {
+			if (res.names === undefined) {
 				check("probe: python probe produced output", false, (err || out).slice(-300));
 			} else {
-				check("probe: catalog has 10 tools", res.count === 10, `got ${res.count}`);
+				check(
+					"probe: catalog has 10 tools",
+					(res.names as string[]).length === 10,
+					`got ${(res.names as string[]).length}`,
+				);
 				check(
 					"probe: real pi.read roundtrip",
 					res.read === "e2e payload\n",
@@ -200,10 +218,9 @@ async function main(): Promise<void> {
 		await waitUntil(() => existsSync(boot2.socketPath), 60_000);
 		await new Promise((r) => setTimeout(r, 300));
 		const probe2 = [
-			"import sys, json",
-			`sys.path.insert(0, ${JSON.stringify(join(REPO, "examples"))})`,
-			"from bridge import pi",
-			"print(json.dumps(sorted(t['name'] for t in pi._catalog())))",
+			...XCHG,
+			'cat = xchg({"v": 1, "op": "catalog"})',
+			'print(json.dumps(sorted(b["name"] for b in cat.get("content", []) if b.get("type") == "tool")))',
 		].join("\n");
 		const py2 = Bun.spawn(["python3", "-c", probe2], {
 			env: { ...process.env, PI_BRIDGE_SOCK: boot2.socketPath },

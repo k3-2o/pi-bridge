@@ -1,14 +1,15 @@
 # pi-bridge
 
-Call **pi's real tools** from Python cells inside the pi repl — through a local
-unix socket, invisibly. A cell calling `pi.read(...)` runs the same read tool, with
-the same schema validation, the same output shaping, and the same errors the model
-would get natively.
+Call **pi's real tools** from code inside the pi repl — through a local unix
+socket, invisibly. A client calling the read tool gets the same schema validation,
+the same output shaping, and the same errors the model would get natively.
+Clients are project-specific and none ships here: the socket speaks a tiny JSONL
+protocol (below), and a helper for your tool subset is ~100 lines of stdlib Python.
 
 ```mermaid
 flowchart LR
-    cell["python cell: pi.read(...)"] --> helper["examples/bridge.py"]
-    helper -- "JSONL over unix socket" --> server["pi-bridge extension (in pi)"]
+    cell["python cell"] --> client["your client helper (not in repo)"]
+    client -- "JSONL over unix socket" --> server["pi-bridge extension (in pi)"]
     server --> tools["pi's real tools + your exportable ones"]
 ```
 
@@ -23,8 +24,9 @@ single Python cell. Zero changes to that package.
 - **The engine owns everything.** `index.ts` + `src/` load the manifest, mount
   pi's real tool factories, run a JSONL server, validate every call against the
   tool's real schema, execute with pi's real context, and format output host-side.
-- **The helper is dumb on purpose.** `examples/bridge.py` connects, handshakes,
-  and returns finished text. `pi.anything()` works for anything the manifest declares.
+- **Clients are disposable.** The wire contract is three ops — ping, catalog,
+  call — newline-framed JSON (see `src/protocol.ts`). A client that reads
+  `PI_BRIDGE_SOCK`, handshakes, and returns text as-is is complete.
 
 Reliability contract: cells only ever see (1) pi's verbatim schema errors,
 (2) the tool's own failures, or (3) one loud message when a connection died
@@ -40,12 +42,10 @@ cp -R . ~/.pi/agent/extensions/pi-bridge    # or: ln -s "$PWD" ~/.pi/agent/exten
 # 2. the manifest
 mkdir -p ~/.pi/agent/pi-bridge
 cp tools.yml.example ~/.pi/agent/pi-bridge/tools.yml   # then edit to taste
-
-# 3. the cell helper
-cp examples/bridge.py ~/.pi/agent/pi-repl/helpers/bridge.py
 ```
 
-Start `pi --repl`. `pi.tools()` from any cell lists what the manifest mounted.
+Start `pi --repl`. The bridge sets `PI_BRIDGE_SOCK` in the kernel's environment;
+the catalog op lists what the manifest mounted.
 
 ## Manifest reference
 
@@ -101,28 +101,28 @@ And one practical preference:
 After adding an entry, `pi.tools()` in a fresh or `/reload`ed session shows it;
 a skipped entry always has its reason on pi's stderr at boot.
 
-## The helper
+## The protocol
 
-```python
-pi.read("notes.txt")            # clean text, ANSI-free, ready to use
-pi.bash("ls -la")               # raises PiBridgeError on non-zero exit
-pi.web_search(query="...")      # your exportable tools, one YAML line each
-pi.tools()                      # what is callable right now, with signatures
-pi.raw(tool, **params)          # full reply dict (content, details, isError)
-```
+| Op | Message | Reply |
+|---|---|---|
+| handshake | `{"v":1,"op":"ping"}` | `{"v":1,"op":"pong"}` |
+| catalog | `{"v":1,"op":"catalog"}` | mounted tools: name, signature, description, source |
+| call | `{"v":1,"op":"call","id":<uuid>,"tool":<name>,"params":{...}}` | clean text blocks, `details` hints (`truncated`/`nextOffset`), `isError` |
 
-Stdlib only. Truncation paging arrives as machine hints: `pi.raw(...)["details"]`
-carries `truncated` / `nextOffset` instead of text notices.
+Errors arrive shaped: pi's verbatim schema message for bad args, the tool's own
+message for failures, one loud message on mid-call connection loss (the call may
+have executed — never blindly retry). A reference client lives in git history:
+`git log --diff-filter=D -- examples/bridge.py`.
 
 ## Troubleshooting
 
 - **`PI_BRIDGE_SOCK is not set`** — the extension did not activate: start pi with
   `--repl` (or `PI_REPL_FORCE=1`), and check stderr for `[pi-bridge]` diagnostics.
-- **`protocol version mismatch`** — an old helper met a new server (or vice versa);
+- **`protocol version mismatch`** — an old client met a new server (or vice versa);
   update the side that lags. Never silent by design.
 - **`connection lost after the call was dispatched`** — the socket died mid-call;
   the call may have run, so re-issue deliberately rather than retrying blindly.
-- **A tool is missing from `pi.tools()`** — its manifest entry was skipped; the
+- **A tool is missing from the catalog** — its manifest entry was skipped; the
   exact reason is in pi's stderr at boot.
 - **`Cannot find package '...'` for an npm store copy** — the package's runtime
   deps are not in the store; use a version that carries them as `dependencies`
@@ -133,11 +133,12 @@ carries `truncated` / `nextOffset` instead of text notices.
 
 ```sh
 just setup   # bun install
-just ci      # fmt + typecheck + lint + 63 tests (incl. cross-language interop)
+just ci      # fmt + typecheck + lint + tests (incl. cross-language interop)
+just e2e     # live gate: real pi, isolated HOME
 just smoke   # extension imports cleanly
 ```
 
-Requires bun 1.4+ (pi's own runtime). The python helper is stdlib-only.
+Requires bun 1.4+ (pi's own runtime).
 
 ## License
 
