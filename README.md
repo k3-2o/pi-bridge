@@ -1,37 +1,48 @@
 # pi-bridge
 
-Call **pi's real tools** from code inside the pi repl — through a local unix
-socket, invisibly. A client calling the read tool gets the same schema validation,
-the same output shaping, and the same errors the model would get natively.
-Clients are project-specific and none ships here: the socket speaks a tiny JSONL
-protocol (below), and a helper for your tool subset is ~100 lines of stdlib Python.
+Call pi's real tools from Python cells inside the pi repl, over a local unix
+socket.
+
+The model in your repl already has read, bash, edit, and the rest: schema
+validation, shaped output, real errors. Cells get the same path. pi-bridge loads
+pi's own tool implementations behind a small server and serves them over a
+socket; nothing is reimplemented in Python.
+
+Clients are project-specific, so none ships here. The socket speaks three ops,
+ping, catalog, call, newline-framed JSON (see `src/protocol.ts`). A helper for
+your tool subset is about a hundred lines of stdlib Python. The manifest decides
+what exists; the engine stays tool-name-blind.
 
 ```mermaid
 flowchart LR
-    cell["python cell"] --> client["your client helper (not in repo)"]
+    cell["python cell"] --> client["your client helper (project-local)"]
     client -- "JSONL over unix socket" --> server["pi-bridge extension (in pi)"]
     server --> tools["pi's real tools + your exportable ones"]
 ```
 
-Companion to the `pi-repl` extension, which replaces all of pi's tools with a
-single Python cell. Zero changes to that package.
-
 ## How it works
 
-- **The manifest is the surface.** `~/.pi/agent/pi-bridge/tools.yml` declares every
-  callable tool: an import source (SDK package or `~/`/`./` file) plus an exported
-  factory name. The engine is tool-name-blind — adding a tool is one YAML line.
+- **The manifest is the surface.** `~/.pi/agent/pi-bridge/tools.yml` declares
+  every callable tool: an import source (SDK package or `~/`/`./` file) plus an
+  exported factory name. Adding a tool is one YAML line, and nothing else.
 - **The engine owns everything.** `index.ts` + `src/` load the manifest, mount
   pi's real tool factories, run a JSONL server, validate every call against the
-  tool's real schema, execute with pi's real context, and format output host-side.
-- **Clients are disposable.** The wire contract is three ops — ping, catalog,
-  call — newline-framed JSON (see `src/protocol.ts`). A client that reads
-  `PI_BRIDGE_SOCK`, handshakes, and returns text as-is is complete.
+  tool's real schema, execute with pi's real context, and format output
+  host-side.
+- **Clients are disposable.** Read `PI_BRIDGE_SOCK`, handshake, return text
+  as-is. That is the whole job. Formatting, error shaping, and transport
+  reliability happen inside pi, once, for every client.
 
-Reliability contract: cells only ever see (1) pi's verbatim schema errors,
-(2) the tool's own failures, or (3) one loud message when a connection died
-mid-call (which may have executed — never blindly retried). Connect-phase races
-are retried invisibly. Everything else about the socket is unobservable.
+Cells only ever see three kinds of failure: pi's verbatim schema errors, the
+tool's own failure text, or one loud message when the socket dies mid-call.
+That last one is the honest catch: the call may have executed, so blind retries
+are wrong. Connect-phase races are retried invisibly. Nothing else about the
+transport is observable.
+
+Side note for the curious: socket files are keyed by pid and swept at boot with
+a `kill(pid, 0)` probe. A SIGKILLed pi leaves its 0-byte socket behind in a
+private dir until the next boot clears it. Harmless. It reads like a
+haunted house.
 
 ## Install
 
@@ -45,7 +56,8 @@ cp tools.yml.example ~/.pi/agent/pi-bridge/tools.yml   # then edit to taste
 ```
 
 Start `pi --repl`. The bridge sets `PI_BRIDGE_SOCK` in the kernel's environment;
-the catalog op lists what the manifest mounted.
+the catalog op lists what the manifest mounted. First boot creates
+`~/.pi/agent/pi-bridge/run/` itself, 0700, so a fresh machine needs nothing.
 
 ## Manifest reference
 
@@ -60,14 +72,14 @@ the catalog op lists what the manifest mounted.
 
 Broken entries never take the bridge down: each failure is skipped with a precise
 diagnostic (wrong path, missing export, garbage factory product, duplicate name),
-and `pi.tools()` only shows what actually mounted.
+and the catalog only shows what mounted.
 
 ## Declaring installed packages (npm or git)
 
 `from:` can point at any file on disk, including a package pi installed for you.
 Two layouts:
 
-- **npm store** — `pi install npm:<pkg>` drops the package at
+- **npm store**: `pi install npm:<pkg>` drops the package at
   `~/.pi/agent/npm/node_modules/<pkg>/`:
 
   ```yaml
@@ -76,7 +88,7 @@ Two layouts:
       cwd: true
   ```
 
-- **git checkout** — `pi install git:github.com/<owner>/<repo>@<ref>` clones into
+- **git checkout**: `pi install git:github.com/<owner>/<repo>@<ref>` clones into
   `~/.pi/agent/git/<host>/<owner>/<repo>/` with a production install run inside
   the checkout. Point `from:` at the checkout's entry file (same pattern). A
   checkout with no declared dependencies may have no `node_modules` at all.
@@ -84,21 +96,20 @@ Two layouts:
 One rule governs both:
 
 - **The package must ship its runtime imports as real `dependencies`** (pi's
-  documented rule for installed packages), not only `peerDependencies`. pi's
-  production install never materializes peers, so the plain import chain from an
-  installed copy finds only what physically sits next to it. A peers-only
-  package fails with `Cannot find package '...'` — even though the identical
-  file loads from `extensions/`, because loose files outside any npm project get
+  documented rule for installed packages). pi's production install never
+  materializes peers, so the plain import chain from an installed copy finds
+  only what physically sits next to it. A peers-only
+  package fails with `Cannot find package '...'`, even though the identical file
+  loads from `extensions/`, because loose files outside any npm project get
   bun's automatic fetch, while installed packages don't.
 
 And one practical preference:
 
-- **Use the `~/` path of the installed copy, not a bare package name.** A bare
-  token resolves through bun's own machinery (it may pull a fresh copy from the
-  registry cache instead of what you installed), so reference the file you
-  actually have.
+- **Reference the installed file by its `~/` path.** A bare token resolves
+  through bun's own machinery and may pull a fresh copy from the registry cache
+  instead of the file you installed.
 
-After adding an entry, `pi.tools()` in a fresh or `/reload`ed session shows it;
+After adding an entry, the catalog in a fresh or `/reload`ed session shows it;
 a skipped entry always has its reason on pi's stderr at boot.
 
 ## The protocol
@@ -110,24 +121,25 @@ a skipped entry always has its reason on pi's stderr at boot.
 | call | `{"v":1,"op":"call","id":<uuid>,"tool":<name>,"params":{...}}` | clean text blocks, `details` hints (`truncated`/`nextOffset`), `isError` |
 
 Errors arrive shaped: pi's verbatim schema message for bad args, the tool's own
-message for failures, one loud message on mid-call connection loss (the call may
-have executed — never blindly retry). A reference client lives in git history:
-`git log --diff-filter=D -- examples/bridge.py`.
+message for failures, one loud message on mid-call connection loss. A reference
+client lives in git history: `git log --diff-filter=D -- examples/bridge.py`.
 
 ## Troubleshooting
 
-- **`PI_BRIDGE_SOCK is not set`** — the extension did not activate: start pi with
-  `--repl` (or `PI_REPL_FORCE=1`), and check stderr for `[pi-bridge]` diagnostics.
-- **`protocol version mismatch`** — an old client met a new server (or vice versa);
-  update the side that lags. Never silent by design.
-- **`connection lost after the call was dispatched`** — the socket died mid-call;
-  the call may have run, so re-issue deliberately rather than retrying blindly.
-- **A tool is missing from the catalog** — its manifest entry was skipped; the
+- **`PI_BRIDGE_SOCK is not set`**: the extension did not activate. Start pi with
+  `--repl` (or `PI_REPL_FORCE=1`), and check stderr for `[pi-bridge]`
+  diagnostics.
+- **`protocol version mismatch`**: an old client met a new server (or vice
+  versa); update the side that lags. Never silent by design.
+- **`connection lost after the call was dispatched`**: the socket died mid-call;
+  the call may have run, so re-issue deliberately. Blind retries risk a double
+  effect.
+- **A tool is missing from the catalog**: its manifest entry was skipped; the
   exact reason is in pi's stderr at boot.
-- **`Cannot find package '...'` for an npm store copy** — the package's runtime
+- **`Cannot find package '...'` for an npm store copy**: the package's runtime
   deps are not in the store; use a version that carries them as `dependencies`
   (see *Declaring npm-installed packages*).
-- **Stale sockets** — swept automatically at every start (pid-liveness probe).
+- **Stale sockets**: swept automatically at every start (pid-liveness probe).
 
 ## Development
 
@@ -138,7 +150,9 @@ just e2e     # live gate: real pi, isolated HOME
 just smoke   # extension imports cleanly
 ```
 
-Requires bun 1.4+ (pi's own runtime).
+Requires bun 1.4+ (pi's own runtime). The e2e boots a real pi in a throwaway
+HOME. That isolation was earned: we once ran a live gate against a working
+session and wrecked it. Yours stays untouched.
 
 ## License
 
