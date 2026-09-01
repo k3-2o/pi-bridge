@@ -116,6 +116,8 @@ Mount it with:
     factory: createGreetTool
 ```
 
+Write it once, the pi way: mount it in code or over YAML, it is the same object.
+
 `parameters` is optional, but supply it and every call is schema-validated for
 free: bad args get pi's verbatim validation message, and the catalog derives a
 readable signature from the schema.
