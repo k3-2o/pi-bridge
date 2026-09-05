@@ -79,7 +79,7 @@ async function main(): Promise<void> {
 	const extDir = join(agent, "extensions", "pi-bridge");
 	const bridgeDir = join(agent, "pi-bridge");
 	const runDir = join(bridgeDir, "run");
-	const manifest = join(bridgeDir, "tools.yml");
+	const manifest = join(bridgeDir, "tools.toml");
 	try {
 		mkdirSync(extDir, { recursive: true });
 		spawnSync("cp", ["-R", join(REPO, "index.ts"), join(extDir, "index.ts")]);
@@ -95,16 +95,18 @@ async function main(): Promise<void> {
 		const entries = ["Read", "Bash", "Write", "Edit", "Grep", "Ls", "Find"]
 			.map(
 				(n) =>
-					`  - from: "@earendil-works/pi-coding-agent"\n    factory: create${n}Tool\n    cwd: true`,
+					`[[tools]]\nfrom = "@earendil-works/pi-coding-agent"\nfactory = "create${n}Tool"\ncwd = true`,
 			)
 			.concat(
 				[
 					["web_search.ts", "createWebSearchTool"],
 					["clipboard.ts", "createClipboardCopyTool"],
 					["ask-user-question.ts", "createAskUserQuestionDefinition"],
-				].map(([file, factory]) => `  - from: "${join(userExt, file)}"\n    factory: ${factory}`),
+				].map(
+					([file, factory]) => `[[tools]]\nfrom = "${join(userExt, file)}"\nfactory = "${factory}"`,
+				),
 			);
-		writeFileSync(manifest, `version: 1\ntools:\n${entries.join("\n")}\n`);
+		writeFileSync(manifest, `version = 1\n\n${entries.join("\n\n")}\n`);
 
 		const boot1 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		const up = await waitUntil(() => existsSync(boot1.socketPath), 60_000);
@@ -196,7 +198,7 @@ async function main(): Promise<void> {
 
 		writeFileSync(
 			manifest,
-			`${await Bun.file(manifest).text()}  - from: "./does-not-exist.ts"\n    factory: createGhost\n  - from: "@earendil-works/pi-coding-agent"\n    factory: notExportedAnywhere\n`,
+			`${await Bun.file(manifest).text()}\n[[tools]]\nfrom = "./does-not-exist.ts"\nfactory = "createGhost"\n\n[[tools]]\nfrom = "@earendil-works/pi-coding-agent"\nfactory = "notExportedAnywhere"\n`,
 		);
 		const boot2 = bootPi({ HOME: e2eHome, PI_REPL_FORCE: "1" }, runDir);
 		await waitUntil(() => existsSync(boot2.socketPath), 60_000);

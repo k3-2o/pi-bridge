@@ -1,0 +1,64 @@
+# pi-bridge manifest — the complete definition of what cells can call.
+# Copy to ~/.pi/agent/pi-bridge/tools.toml and edit; /reload or restart applies.
+#
+# Grammar for `from`:
+#   bare token      → a package name (import from the SDK or any installed package)
+#   "~/..."         → a file on disk, home-anchored (incl. npm store copies)
+#   "./..." "../.." → a file relative to this manifest's directory
+#
+# Entry fields:
+#   factory  (required)  exported function name; must return { name, execute }
+#   cwd      (optional)  pass the session cwd to the factory (SDK tools want this)
+#   name     (optional)  mount under a different name
+#   timeout  (optional)  seconds; only for tools that cannot govern themselves
+
+version = 1
+
+# pi's built-ins come from the SDK itself — you pick which ones cells get:
+[[tools]]
+from = "@earendil-works/pi-coding-agent"
+factory = "createReadTool"
+cwd = true
+
+[[tools]]
+from = "@earendil-works/pi-coding-agent"
+factory = "createBashTool"
+cwd = true
+
+[[tools]]
+from = "@earendil-works/pi-coding-agent"
+factory = "createWriteTool"
+cwd = true
+
+[[tools]]
+from = "@earendil-works/pi-coding-agent"
+factory = "createEditTool"
+cwd = true
+
+[[tools]]
+from = "@earendil-works/pi-coding-agent"
+factory = "createGrepTool"
+cwd = true
+
+[[tools]]
+from = "@earendil-works/pi-coding-agent"
+factory = "createLsTool"
+cwd = true
+
+[[tools]]
+from = "@earendil-works/pi-coding-agent"
+factory = "createFindTool"
+cwd = true
+
+# your own extension tools — anything that exports a factory is one block away:
+[[tools]]
+from = "~/.pi/agent/extensions/web_search.ts"
+factory = "createWebSearchTool"
+
+[[tools]]
+from = "~/.pi/agent/extensions/clipboard.ts"
+factory = "createClipboardCopyTool"
+
+[[tools]]
+from = "~/.pi/agent/extensions/ask-user-question.ts"
+factory = "createAskUserQuestionDefinition"

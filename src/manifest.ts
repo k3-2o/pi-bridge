@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { BridgeConfigError, manifestFileDiagnostic } from "./errors.ts";
 
-export const DEFAULT_MANIFEST_PATH = join(homedir(), ".pi", "agent", "pi-bridge", "tools.yml");
+export const DEFAULT_MANIFEST_PATH = join(homedir(), ".pi", "agent", "pi-bridge", "tools.toml");
 
 export interface ManifestEntry {
 	/** Absolute file path or bare package specifier — what loader.ts will import(). */
@@ -62,9 +62,9 @@ export function parseManifest(
 
 	let parsed: unknown;
 	try {
-		parsed = Bun.YAML.parse(text);
+		parsed = Bun.TOML.parse(text);
 	} catch (err) {
-		return fail(`invalid YAML — ${err instanceof Error ? err.message : String(err)}`);
+		return fail(`invalid TOML — ${err instanceof Error ? err.message : String(err)}`);
 	}
 	if (typeof parsed !== "object" || parsed === null) {
 		return fail("top level must be a mapping");

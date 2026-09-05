@@ -21,8 +21,8 @@ your Python, in the pi-repl-py kernel
 ```sh
 pi install git:github.com/k3-2o/pi-bridge
 mkdir -p ~/.pi/agent/pi-bridge
-cp ~/.pi/agent/git/github.com/k3-2o/pi-bridge/examples/tools.yml \
-   ~/.pi/agent/pi-bridge/tools.yml                       # then edit to taste
+cp ~/.pi/agent/git/github.com/k3-2o/pi-bridge/examples/tools.toml \
+   ~/.pi/agent/pi-bridge/tools.toml                      # then edit to taste
 ```
 
 **Manual (git clone):**
@@ -31,7 +31,7 @@ cp ~/.pi/agent/git/github.com/k3-2o/pi-bridge/examples/tools.yml \
 git clone https://github.com/k3-2o/pi-bridge.git
 cp -R pi-bridge ~/.pi/agent/extensions/pi-bridge
 mkdir -p ~/.pi/agent/pi-bridge
-cp pi-bridge/examples/tools.yml ~/.pi/agent/pi-bridge/tools.yml   # then edit to taste
+cp pi-bridge/examples/tools.toml ~/.pi/agent/pi-bridge/tools.toml  # then edit to taste
 ```
 
 Start `pi --repl`. At every session start, before the kernel spawns, the bridge
@@ -41,10 +41,10 @@ Helpers only connect; nothing is lazy.
 
 ## The manifest
 
-`~/.pi/agent/pi-bridge/tools.yml` decides which tools exist. Each entry is a
-module plus the factory to call; the engine is tool-name-blind, so one YAML line
-adds a tool. The full annotated file, both `from:` forms included:
-[examples/tools.yml](examples/tools.yml).
+`~/.pi/agent/pi-bridge/tools.toml` decides which tools exist. Each entry is a
+module plus the factory to call; the engine is tool-name-blind, so one TOML
+block adds a tool. The full annotated file, both `from` forms included:
+[examples/tools.toml](examples/tools.toml).
 
 ### What "exportable" means
 
@@ -75,9 +75,10 @@ export function createAskUserQuestionDefinition() {
 }
 ```
 
-```yaml
-  - from: "~/.pi/agent/extensions/ask-user-question.ts"
-    factory: createAskUserQuestionDefinition
+```toml
+[[tools]]
+from = "~/.pi/agent/extensions/ask-user-question.ts"
+factory = "createAskUserQuestionDefinition"
 ```
 
 Not exported, nothing to import; exported like the SDK's own tools, it mounts
@@ -94,8 +95,8 @@ tool, the full wire contract is here:
 
 ## Examples
 
-- `examples/tools.yml`: the manifest template, annotated line by line. Copy it
-  to `~/.pi/agent/pi-bridge/tools.yml`, keep the SDK entries you want, delete
+- `examples/tools.toml`: the manifest template, annotated line by line. Copy it
+  to `~/.pi/agent/pi-bridge/tools.toml`, keep the SDK entries you want, delete
   the rest.
 - `examples/skills/bridge-helper/`: a pi skill that does the helper work for
   you. It reads your live catalog, writes a project-local helper wrapping

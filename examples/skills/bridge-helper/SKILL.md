@@ -22,7 +22,7 @@ before writing any socket code.
 2. **Fix the tool set.** From the user's request, list the tools the helper
    wraps. A requested tool that is not in the catalog cannot be wrapped: say so
    and show the manifest line that would mount it
-   (`~/.pi/agent/pi-bridge/tools.yml`); never edit the manifest or the engine.
+   (`~/.pi/agent/pi-bridge/tools.toml`); never edit the manifest or the engine.
 3. **Write the helper.** Start from [assets/example_helper.py](assets/example_helper.py)
    as an example, not a template to stamp. Decide per project:
    - wrap exactly the requested tools as typed methods; take kwarg names and
@@ -61,7 +61,7 @@ any change to the skill.
 ## Rules
 
 - The catalog is the only source for names, kwargs, and types
-- Never touch `tools.yml`, the engine, or pi's process
+- Never touch `tools.toml`, the engine, or pi's process
 - Never write the helper before the catalog read succeeds (Eval 2)
 - The test must exist, run, and pass before you report done
 - A test file never sits in a helper dir named without a leading underscore

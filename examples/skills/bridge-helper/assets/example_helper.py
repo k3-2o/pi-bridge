@@ -1,7 +1,7 @@
 """pi — pi's native tools inside repl cells, served by the pi-bridge extension.
 
 The TS bridge does all the work: it loads the tool surface from
-~/.pi/agent/pi-bridge/tools.yml, runs pi's real tool implementations, and sends
+~/.pi/agent/pi-bridge/tools.toml, runs pi's real tool implementations, and sends
 back finished text. This helper only carries calls over the socket and returns
 what arrives — formatting, validation, and error shaping all happened host-side.
 
@@ -14,10 +14,10 @@ one monolithic cell.
 # The model contract: pi-repl-py extracts this verbatim as the tool description.
 helper_description = """pi — pi's real tools from the repl, over the pi-bridge bridge:
 pi.tools() — start here: lists every loaded tool with signatures.
-pi.<name>(**params) — any tool in ~/.pi/agent/pi-bridge/tools.yml; keyword args only.
+pi.<name>(**params) — any tool in ~/.pi/agent/pi-bridge/tools.toml; keyword args only.
 pi.raw(tool, **params) — full reply dict; details carry truncation hints (truncated, nextOffset).
 Treat each pi.* call as a real tool call: args are schema-validated, failures raise PiBridgeError with pi's message.
-The manifest (~/.pi/agent/pi-bridge/tools.yml) defines the surface — nothing is hardcoded in this helper."""
+The manifest (~/.pi/agent/pi-bridge/tools.toml) defines the surface — nothing is hardcoded in this helper."""
 
 import json
 import os
