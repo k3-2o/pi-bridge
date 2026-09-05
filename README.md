@@ -16,8 +16,6 @@ your Python, in the pi-repl-py kernel
 
 ## Install
 
-**With pi's package manager (recommended):**
-
 ```sh
 pi install git:github.com/k3-2o/pi-bridge
 mkdir -p ~/.pi/agent/pi-bridge
@@ -25,18 +23,8 @@ cp ~/.pi/agent/git/github.com/k3-2o/pi-bridge/examples/tools.toml \
    ~/.pi/agent/pi-bridge/tools.toml                      # then edit to taste
 ```
 
-**Manual (git clone):**
-
-```sh
-git clone https://github.com/k3-2o/pi-bridge.git
-cp -R pi-bridge ~/.pi/agent/extensions/pi-bridge
-mkdir -p ~/.pi/agent/pi-bridge
-cp pi-bridge/examples/tools.toml ~/.pi/agent/pi-bridge/tools.toml  # then edit to taste
-```
-
-**Updating:** the installed extension is a snapshot of this repo — after pulling,
-re-run `pi install git:github.com/k3-2o/pi-bridge` (or re-copy). Your manifest at
-`~/.pi/agent/pi-bridge/` is yours; updates never touch it.
+**Updating:** re-run the install command — it refreshes the extension; your
+manifest at `~/.pi/agent/pi-bridge/` is yours and is never touched.
 
 Start `pi --repl`. At every session start, before the kernel spawns, the bridge
 creates the run dir if missing (0700), sweeps stale sockets, starts listening on
