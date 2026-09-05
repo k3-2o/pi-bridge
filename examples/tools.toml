@@ -63,17 +63,19 @@ factory = "createClipboardCopyTool"
 from = "~/.pi/agent/extensions/ask-user-question.ts"
 factory = "createAskUserQuestionDefinition"
 
-# npm-installed extensions: bare package names resolve from the extension's own
-# directory, so point at the pi npm store copy directly:
+# npm and git packages: the module must export a named factory returning
+# { name, execute }, and pi itself must sit in "dependencies", never
+# "peerDependencies" — store copies never resolve peers against the running
+# pi, so the import fails.
+#
+# npm: point at the pi store copy (bare names resolve from the extension dir):
 # [[tools]]
 # from = "~/.pi/agent/npm/node_modules/@k3_2o/pi-read-image/index.ts"
 # factory = "createReadImageTool"
 # cwd = true
 #
-# git-installed packages (pi install git:...) land under ~/.pi/agent/git/ —
-# same shape. Unverified here: only mounts if that repo actually exports a
-# tool factory (many extensions, e.g. providers, register tools internally
-# instead and export nothing).
+# git (pi install git:...) lands under ~/.pi/agent/git/, same shape; mounts
+# only if the repo exports a factory (providers register internally, export nothing):
 # [[tools]]
 # from = "~/.pi/agent/git/github.com/<owner>/<repo>/index.ts"
 # factory = "createSomeTool"
