@@ -34,6 +34,10 @@ mkdir -p ~/.pi/agent/pi-bridge
 cp pi-bridge/examples/tools.toml ~/.pi/agent/pi-bridge/tools.toml  # then edit to taste
 ```
 
+**Updating:** the installed extension is a snapshot of this repo — after pulling,
+re-run `pi install git:github.com/k3-2o/pi-bridge` (or re-copy). Your manifest at
+`~/.pi/agent/pi-bridge/` is yours; updates never touch it.
+
 Start `pi --repl`. At every session start, before the kernel spawns, the bridge
 creates the run dir if missing (0700), sweeps stale sockets, starts listening on
 a fresh `pi-bridge-<pid>.sock` (0600), and sets `PI_BRIDGE_SOCK` for the kernel.

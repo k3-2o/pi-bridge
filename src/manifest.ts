@@ -141,10 +141,14 @@ export function parseManifest(
 export async function readManifest(path: string = DEFAULT_MANIFEST_PATH): Promise<ManifestResult> {
 	const file = Bun.file(path);
 	if (!(await file.exists())) {
+		const legacy = path.replace(/\.toml$/, ".yml");
+		const hint = existsSync(legacy)
+			? ` — legacy ${legacy} exists: rename it to tools.toml (YAML support removed)`
+			: "";
 		return {
 			entries: [],
 			diagnostics: [
-				manifestFileDiagnostic(path, "not found — bridge boots with no declared tools"),
+				manifestFileDiagnostic(path, `not found${hint} — bridge boots with no declared tools`),
 			],
 		};
 	}

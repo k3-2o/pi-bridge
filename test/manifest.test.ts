@@ -17,6 +17,14 @@ describe("FR-002 row 1-2: missing file / invalid TOML boot empty with a diagnost
 		expect(res.diagnostics[0]).toContain("not found");
 	});
 
+	test("legacy tools.yml next to a missing tools.toml gets a rename hint", async () => {
+		const dir = tmpDir();
+		writeFileSync(join(dir, "tools.yml"), "version = 1\n");
+		const res = await readManifest(join(dir, "tools.toml"));
+		expect(res.entries).toHaveLength(0);
+		expect(res.diagnostics[0]).toContain("rename it to tools.toml");
+	});
+
 	test("invalid TOML surfaces the parser message, boots empty", () => {
 		const res = parseManifest("[[tools", { dir: "/x" });
 		expect(res.entries).toHaveLength(0);
