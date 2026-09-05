@@ -62,3 +62,18 @@ factory = "createClipboardCopyTool"
 [[tools]]
 from = "~/.pi/agent/extensions/ask-user-question.ts"
 factory = "createAskUserQuestionDefinition"
+
+# npm-installed extensions: bare package names resolve from the extension's own
+# directory, so point at the pi npm store copy directly:
+# [[tools]]
+# from = "~/.pi/agent/npm/node_modules/@k3_2o/pi-read-image/index.ts"
+# factory = "createReadImageTool"
+# cwd = true
+#
+# git-installed packages (pi install git:...) land under ~/.pi/agent/git/ —
+# same shape. Unverified here: only mounts if that repo actually exports a
+# tool factory (many extensions, e.g. providers, register tools internally
+# instead and export nothing).
+# [[tools]]
+# from = "~/.pi/agent/git/github.com/<owner>/<repo>/index.ts"
+# factory = "createSomeTool"
