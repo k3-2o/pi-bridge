@@ -10,7 +10,9 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
+		"@earendil-works/pi-coding-agent": "^0.84.4",
 		"@types/bun": "^1.2.0",
+		"typebox": "1.3.7",
 		"typescript": "^5.6.0"
 	},
 	"keywords": ["pi-package", "pi", "agent", "tools", "bridge"],
@@ -21,8 +23,5 @@
 		"type": "git",
 		"url": "git+https://github.com/k3-2o/pi-bridge.git"
 	},
-	"dependencies": {
-		"@earendil-works/pi-coding-agent": "^0.84.4",
-		"typebox": "1.3.7"
-	}
+	"dependencies": {}
 }

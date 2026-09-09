@@ -63,19 +63,16 @@ factory = "createClipboardCopyTool"
 from = "~/.pi/agent/extensions/ask-user-question.ts"
 factory = "createAskUserQuestionDefinition"
 
-# npm and git packages: the module must export a named factory returning
-# { name, execute }, and pi itself must sit in "dependencies", never
-# "peerDependencies" — store copies never resolve peers against the running
-# pi, so the import fails.
+# Resolution: the bridge ships zero runtime dependencies. pi's extension
+# loader resolves "@earendil-works/pi-coding-agent" and "typebox" against its
+# own running copies, so bare SDK specifiers cost no extra install and never
+# drift from the pi you are running.
 #
-# npm: point at the pi store copy (bare names resolve from the extension dir):
+# Other packages: give the file path pi already installed —
+# npm store: ~/.pi/agent/npm/node_modules/<pkg>/index.ts
+# git:      ~/.pi/agent/git/github.com/<owner>/<repo>/index.ts
+# Both must export a named factory returning { name, execute }:
 # [[tools]]
 # from = "~/.pi/agent/npm/node_modules/@k3_2o/pi-read-image/index.ts"
 # factory = "createReadImageTool"
 # cwd = true
-#
-# git (pi install git:...) lands under ~/.pi/agent/git/, same shape; mounts
-# only if the repo exports a factory (providers register internally, export nothing):
-# [[tools]]
-# from = "~/.pi/agent/git/github.com/<owner>/<repo>/index.ts"
-# factory = "createSomeTool"
