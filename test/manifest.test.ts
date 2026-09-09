@@ -1,12 +1,18 @@
-import { describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseManifest, readManifest } from "../src/manifest.ts";
 
+const dirs: string[] = [];
 function tmpDir(): string {
-	return mkdtempSync(join(tmpdir(), "pi-bridge-manifest-"));
+	const dir = mkdtempSync(join(tmpdir(), "pi-bridge-manifest-"));
+	dirs.push(dir);
+	return dir;
 }
+afterAll(() => {
+	for (const d of dirs) rmSync(d, { recursive: true, force: true });
+});
 
 describe("FR-002 row 1-2: missing file / invalid TOML boot empty with a diagnostic", () => {
 	test("missing file names the path it looked at", async () => {
