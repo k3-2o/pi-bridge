@@ -14,18 +14,33 @@ export const BRIDGE_ENV = "PI_BRIDGE_SOCK";
 export async function startBridge(pi: ExtensionAPI): Promise<void> {
 	let server: BridgeServer | undefined;
 	let socketPath: string | undefined;
-	// tools() reads the CURRENT map, so a session_start rebind needs no server restart.
-	let tools = new Map<string, MountedTool>();
+	// Session cwd at call time — a new session rebinds factories without a server restart (FR-003-2).
+	let currentCwd = "";
+	let mounted: Promise<Map<string, MountedTool>> | undefined;
+	let mountedCwd: string | undefined;
 	const registry = new Map<string, RegistryEntry>();
+
+	/** Manifest+loader run on the first frame that needs tools, once per cwd (FR-002 holds; only the timing moves). */
+	function tools(): Promise<Map<string, MountedTool>> {
+		if (!mounted || mountedCwd !== currentCwd) {
+			mountedCwd = currentCwd;
+			mounted = (async () => {
+				const manifest = await readManifest();
+				for (const line of manifest.diagnostics) console.error(line);
+				const loaded = await loadTools(manifest.entries, currentCwd);
+				for (const line of loaded.diagnostics) console.error(line);
+				return loaded.tools;
+			})();
+			mounted.catch(() => {
+				mounted = undefined;
+			});
+		}
+		return mounted;
+	}
 
 	// Global extensions load before packages: socket + env var are race-free with kernel spawn.
 	pi.on("session_start", async (_event, ctx) => {
-		const manifest = await readManifest();
-		for (const line of manifest.diagnostics) console.error(line);
-
-		const loaded = await loadTools(manifest.entries, ctx.cwd);
-		for (const line of loaded.diagnostics) console.error(line);
-		tools = loaded.tools;
+		currentCwd = ctx.cwd;
 
 		try {
 			registry.clear();
@@ -44,14 +59,14 @@ export async function startBridge(pi: ExtensionAPI): Promise<void> {
 		}
 
 		server ??= new BridgeServer({
-			tools: () => tools,
+			tools,
 			registry: () => registry,
 			ctx,
 		});
 		socketPath ??= join(pickSocketDir(), `pi-bridge-${process.pid}.sock`);
 		server.start(socketPath);
 		process.env[BRIDGE_ENV] = socketPath;
-		if (ctx.hasUI) ctx.ui.notify(`pi-bridge: ${tools.size} tools ready`, "info");
+		if (ctx.hasUI) ctx.ui.notify("pi-bridge: socket ready — tools load on first call", "info");
 	});
 
 	pi.on("session_shutdown", async () => {

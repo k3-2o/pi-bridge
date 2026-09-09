@@ -50,7 +50,7 @@ function startServer(tools: Map<string, MountedTool>, registry?: Map<string, Reg
 	const socketPath = join(tmp(), `pi-bridge-${process.pid}.sock`);
 	const server = new BridgeServer({
 		socketPath,
-		tools: () => tools,
+		tools: async () => tools,
 		registry: registry ? () => registry : undefined,
 	});
 	server.start();
@@ -374,5 +374,33 @@ describe("lifecycle", () => {
 		server.stop();
 		expect(server.started).toBe(false);
 		expect(existsSync(socketPath)).toBe(false);
+	});
+});
+
+describe("lazy tool loading", () => {
+	test("catalog and call await a tools() promise that is still loading", async () => {
+		const tool = makeTool("slow_mount");
+		let resolveLoad: (m: Map<string, MountedTool>) => void = () => {};
+		const loaded = new Promise<Map<string, MountedTool>>((r) => {
+			resolveLoad = r;
+		});
+		const socketPath = join(tmp(), `pi-bridge-${process.pid}.sock`);
+		const server = new BridgeServer({ socketPath, tools: () => loaded });
+		server.start();
+		const conn = client(socketPath);
+		await conn.connected;
+		await handshake(conn);
+
+		conn.send({ v: 1, op: "catalog" });
+		await new Promise((r) => setTimeout(r, 50)); // request in flight, loader pending
+		resolveLoad(new Map([[tool.name, tool]]));
+		const rep = await conn.next();
+		expect(rep.ok).toBe(true);
+		const names = (rep.content as Array<{ type: string; name: string }>)
+			.filter((b) => b.type === "tool")
+			.map((b) => b.name);
+		expect(names).toEqual(["slow_mount"]);
+		conn.destroy();
+		server.stop();
 	});
 });

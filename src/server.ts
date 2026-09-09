@@ -34,8 +34,8 @@ export interface RegistryEntry {
 
 export interface BridgeServerOptions {
 	socketPath?: string;
-	/** Live tools lookup — the index rebinds per session cwd without a server restart. */
-	tools: () => Map<string, MountedTool>;
+	/** Live tools lookup — may load on first call; the index rebinds per session cwd. */
+	tools: () => Promise<Map<string, MountedTool>>;
 	/** pi registry metadata (descriptions, sourceInfo) for catalog replies. */
 	registry?: () => Map<string, RegistryEntry>;
 	/** Execution context passed to tool.execute; real one arrives in session_start. */
@@ -227,15 +227,15 @@ export class BridgeServer {
 			return;
 		}
 		if (req.op === "catalog") {
-			this.write(conn, this.catalogReply());
+			this.write(conn, await this.catalogReply());
 			return;
 		}
 		if (req.op !== "call") return;
 		await this.call(conn, req, local);
 	}
 
-	private catalogReply(): Reply {
-		const tools = this.opts.tools();
+	private async catalogReply(): Promise<Reply> {
+		const tools = await this.opts.tools();
 		const registry = this.opts.registry?.() ?? new Map<string, RegistryEntry>();
 		const content = [...tools.values()].map((m) => {
 			const meta = registry.get(m.name);
@@ -255,7 +255,7 @@ export class BridgeServer {
 		req: Extract<BridgeRequest, { op: "call" }>,
 		local: Set<string>,
 	): Promise<void> {
-		const tools = this.opts.tools();
+		const tools = await this.opts.tools();
 		const mounted = tools.get(req.tool);
 		if (!mounted) {
 			const suggestion = nearestName(req.tool, tools.keys());
